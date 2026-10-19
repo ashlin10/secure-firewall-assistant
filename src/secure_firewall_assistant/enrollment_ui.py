@@ -8,7 +8,6 @@ import secrets
 import threading
 import time
 import uuid
-from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -65,7 +64,7 @@ class EnrollmentUI:
                               structured_content=public,
                               _meta={"enrollment": {"endpoint": self.origin + "/enroll/" + identifier,
                                                     "authorization": authorization, "alias": alias,
-                                                    "address": device.address, "username": username,
+                                                    "address": device.address, "username": username, "kind": kind,
                                                     "domain": domain or "", "expires": self.sessions[identifier]["expires"]}})
 
     def status(self, identifier):
@@ -131,36 +130,47 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {"ok": False})
 
     def do_POST(self):
+        # Consume bounded request bodies before rejecting authorization. Closing a
+        # Windows socket with unread data can reset it and hide the JSON error.
+        try:
+            size = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return self.reply(400, {"ok": False, "message": "Invalid form submission."})
+        if not 0 < size <= 32768 or self.headers.get("Transfer-Encoding"):
+            return self.reply(413, {"ok": False})
+        raw = self.rfile.read(size)
         job = self.job()
         if (job is None or not secrets.compare_digest(self.headers.get("X-SFA-Enrollment", ""), job["authorization"]) or
                 self.headers.get("Content-Type", "").split(";")[0] != "application/json" or
                 self.headers.get("Transfer-Encoding")):
             return self.reply(403, {"ok": False, "message": "Enrollment unavailable or request rejected."})
         try:
-            size = int(self.headers.get("Content-Length", "0"))
-            if not 0 < size <= 32768:
-                return self.reply(413, {"ok": False})
-            fields = json.loads(self.rfile.read(size))
-            if (not isinstance(fields, dict) or set(fields) != {"password", "repeat", "domain", "ca"} or
+            fields = json.loads(raw)
+            if (not isinstance(fields, dict) or set(fields) != {"password", "repeat"} or
                     any(not isinstance(v, str) for v in fields.values())):
                 return self.reply(400, {"ok": False, "message": "Invalid form fields."})
             if not fields["password"] or fields["password"] != fields["repeat"]:
                 return self.reply(400, {"ok": False, "message": "Passwords must be nonempty and match."})
-            ca = fields["ca"].strip()
-            if ca and not Path(ca).expanduser().is_file():
-                return self.reply(400, {"ok": False, "message": "The CA file was not found on this computer."})
-            device = replace(job["device"], domain=fields["domain"].strip() or None,
-                             ca_bundle=str(Path(ca).expanduser().resolve()) if ca else None)
+            device = job["device"]
             owner = self.server.owner
-            with owner.lock, owner.state.target_lock(device.alias):
+            with owner.lock:
                 if job["status"] != "waiting" or job["expires"] <= time.time():
                     return self.reply(409, {"ok": False, "message": "Start a fresh enrollment form."})
-                if device.alias in owner.state.inventory()["devices"]:
-                    return self.reply(409, {"ok": False, "message": "This alias is already enrolled."})
-                owner.store.set(device.credential_ref, fields["password"])
-                owner.state.save_device(device)
-                job["status"] = "enrolled"
-                job["authorization"] = ""
+                job["status"] = "saving"
+            try:
+                # Native-store prompts can block. Status reads must remain available.
+                with owner.state.target_lock(device.alias):
+                    if device.alias in owner.state.inventory()["devices"]:
+                        return self.reply(409, {"ok": False, "message": "This alias is already enrolled."})
+                    owner.store.set(device.credential_ref, fields["password"])
+                    owner.state.save_device(device)
+                with owner.lock:
+                    job["status"] = "enrolled"
+                    job["authorization"] = ""
+            finally:
+                with owner.lock:
+                    if job["status"] == "saving":
+                        job["status"] = "waiting"
             return self.reply(200, {"ok": True, "alias": device.alias, "status": "enrolled"})
         except (ValueError, UnicodeError):
             return self.reply(400, {"ok": False, "message": "Invalid form submission."})

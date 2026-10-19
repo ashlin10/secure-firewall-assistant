@@ -1,5 +1,13 @@
 # Validation report — 19 October 2026
 
+## 0.3.2 enrollment feedback and CI correction
+
+- 86 tests pass locally, including save confirmation, separate FMC connection results, lost/blocked response handling, bounded fetch timeout, native-store failure/retry, and responsive status during a synthetic native-store prompt.
+- The card removes domain/CA controls and uses explicit light/dark foreground/background pairs. Credentials stay exclusively in the direct loopback submission.
+- Run 39226877614 failed on Windows because a rejected request produced WinError 10053; bounded request bodies are now consumed before rejection. Its macOS job was cancelled by the matrix's fail-fast behavior.
+- Run 39226890924 passed on Windows and failed two real stdio tests on macOS with initialization timeouts. CI now uses managed Python instead of the runner's Framework Python, unbuffered subprocess startup, a 60-second initialization budget, independent matrix jobs, and retained test reports. New remote results must be checked after push.
+- Live enrollment still requires user password entry and host loopback permission. No live credential values were inspected or supplied during this update.
+
 ## 0.3.1 local connection correction
 
 - The installed desktop/CLI loaded the plugin skill but omitted the bundled server from `codex mcp list`, even with compatibility files. Explicit `codex mcp add secure-firewall` now registers the installed stdio helper and reports it enabled.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+- Make enrollment text readable in light/dark themes and remove domain/CA controls from the card.
+- Bound save requests, confirm saved status, check FMC connectivity separately, and support checking after a lost response.
+- Keep status reads responsive while native credential-store prompts are open.
+- Consume rejected enrollment request bodies to prevent Windows connection resets.
+- Use managed Python in CI, allow slower cold stdio startup, and retain failed test reports for both platforms.
+
 ## 0.3.1
 
 - Include Codex compatibility manifests and keep both MCP launch files aligned during installation.

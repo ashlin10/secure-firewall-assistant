@@ -4,11 +4,13 @@
 
 Ask: “Enroll FMC lab-fmc-1 at https://my-fmc using username api-user.”
 `start_enrollment` returns an **embedded MCP App card inside the conversation**,
-not a browser URL. Enter and repeat the password in that card, optionally set
-an exact domain and local CA bundle path, then select **Save enrollment**.
+not a browser URL. Enter and repeat the password in that card, then select **Save enrollment**.
+The card has no domain or CA-file controls. It confirms the saved enrollment
+through a status read and checks FMC connectivity separately. If a save response
+times out, select **Check enrollment status** before retrying. Complete any native
+Keychain/Credential Manager prompt on your computer.
 The password goes directly from the card to a short-lived loopback endpoint and
-then to Keychain/Credential Manager. Return to chat and say “done” to check
-connectivity. Existing aliases cannot be overwritten through the form.
+then to Keychain/Credential Manager. Return to chat if the connection check needs follow-up. Existing aliases cannot be overwritten through the form.
 
 You can also open **Secure Firewall enrollment** through the plugin's app
 entrypoint, enter the FMC name/address/username, select **Continue**, then save

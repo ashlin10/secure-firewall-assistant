@@ -42,9 +42,9 @@ def test_tool_discovery_and_mock_device_calls(assistant, lab):
 @pytest.mark.parametrize("mode", ["auto", "legacy"])
 def test_real_stdio_process_is_clean_and_discovers_tools(tmp_path, mode):
     async def run():
-        params = StdioServerParameters(command=sys.executable, args=["-m", "secure_firewall_assistant.cli", "serve"],
+        params = StdioServerParameters(command=sys.executable, args=["-u", "-m", "secure_firewall_assistant.cli", "serve"],
                                        env={**os.environ, "SFA_DATA_DIR": str(tmp_path / "private")})
-        async with Client(params, read_timeout_seconds=20, mode=mode) as client:
+        async with Client(params, read_timeout_seconds=60, mode=mode) as client:
             tools = await client.list_tools()
             assert len(tools.tools) == 15
             result = data(await client.call_tool("assistant_health"))

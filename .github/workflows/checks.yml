@@ -8,7 +8,11 @@ permissions:
   contents: read
 jobs:
   test:
+    timeout-minutes: 15
+    env:
+      UV_MANAGED_PYTHON: "1"
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -17,11 +21,13 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: '0.10.4'
+      - run: uv python install 3.12
       - run: uv sync --frozen
       - run: uv run --offline ruff check .
-      - run: uv run --offline pytest --junitxml=test-results.xml
+      - run: uv run --offline pytest -v --durations=10 --junitxml=test-results.xml
       - run: uv run --offline python scripts/package.py --output dist
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: secure-firewall-assistant-${{ matrix.os }}
           path: |

@@ -36,7 +36,7 @@ def headers(meta):
 
 def fields(**updates):
     return {'password': 'synthetic-inline-value', 'repeat': 'synthetic-inline-value',
-            'domain': 'Global', 'ca': '', **updates}
+            **updates}
 
 
 def test_inline_completion_is_private_and_single_use(form, capsys):
@@ -48,7 +48,7 @@ def test_inline_completion_is_private_and_single_use(form, capsys):
     assert store.values == {'fixture-auth': 'synthetic-inline-value'}
     assert 'synthetic-inline-value' not in response.text
     assert 'synthetic-inline-value' not in state.inventory_path.read_text()
-    assert state.device('fixture').domain == 'Global'
+    assert state.device('fixture').domain is None
     assert ui.status(meta['endpoint'].rsplit('/', 1)[1])['status'] == 'enrolled'
     assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 403
     assert 'synthetic-inline-value' not in str(capsys.readouterr())
@@ -132,3 +132,56 @@ def test_card_keeps_password_out_of_host_bridge():
     root = Path(__file__).resolve().parents[1]
     subprocess.run([node, str(root / 'tests/card_flow.mjs'),
                     str(root / 'src/secure_firewall_assistant/enrollment_card.html')], check=True)
+
+
+def test_status_remains_responsive_during_native_store_prompt(form):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    ui, meta, state, store = form
+    entered, release = threading.Event(), threading.Event()
+    original = store.set
+
+    def prompted_set(reference, value):
+        entered.set()
+        assert release.wait(5), 'test did not release synthetic native-store prompt'
+        original(reference, value)
+
+    store.set = prompted_set
+    identifier = meta['endpoint'].rsplit('/', 1)[1]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        saving = pool.submit(httpx.post, meta['endpoint'], json=fields(), headers=headers(meta))
+        try:
+            assert entered.wait(3)
+            assert pool.submit(ui.status, identifier).result(timeout=1)['status'] == 'saving'
+            assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 403
+        finally:
+            release.set()
+        assert saving.result(timeout=3).status_code == 200
+    assert ui.status(identifier)['status'] == 'enrolled'
+
+
+def test_native_store_failure_can_be_retried_without_false_success(form):
+    ui, meta, state, store = form
+    original = store.set
+
+    def fail(*args):
+        raise RuntimeError('synthetic-private-error')
+
+    store.set = fail
+    response = httpx.post(meta['endpoint'], json=fields(), headers=headers(meta))
+    assert response.status_code == 500
+    assert 'synthetic-private-error' not in response.text
+    assert ui.status(meta['endpoint'].rsplit('/', 1)[1])['status'] == 'waiting'
+    assert state.aliases() == []
+    store.set = original
+    assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 200
+
+
+def test_enrollment_preserves_explicit_domain_without_card_overrides(form):
+    ui, meta, state, store = form
+    result = ui.start('fmc', 'domain-fixture', 'https://fmc.example.invalid', 'tester', domain='Lab')
+    meta = result.model_dump(by_alias=True)['_meta']['enrollment']
+    assert httpx.post(meta['endpoint'], json=fields(domain='Other'), headers=headers(meta)).status_code == 400
+    assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 200
+    assert state.device('domain-fixture').domain == 'Lab'

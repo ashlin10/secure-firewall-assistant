@@ -2,10 +2,11 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Enroll Secure Firewall device</title>
 <style>
-:root{color-scheme:light dark;font-family:system-ui,sans-serif;color:var(--color-text-primary,#18212e);background:var(--color-background-primary,#fff)}
-*{box-sizing:border-box}body{margin:0;padding:20px}main{max-width:560px;margin:auto}h2{font-size:20px;margin:0 0 8px}p{line-height:1.5}.muted{font-size:13px;color:var(--color-text-secondary,#626c79)}
-dl{display:grid;grid-template-columns:90px 1fr;gap:8px;margin:20px 0}dt{color:var(--color-text-secondary,#626c79)}dd{margin:0;overflow-wrap:anywhere}label{display:block;font-size:14px;margin-top:14px}
-input{width:100%;font:inherit;padding:11px;border:1px solid #8994a3;border-radius:8px;background:var(--color-background-primary,#fff);color:inherit;margin-top:6px}button{font:inherit;font-weight:600;width:100%;padding:12px;border:0;border-radius:9px;color:#fff;background:#1761cf;margin-top:20px}button:disabled{opacity:.55}#status{min-height:24px}details{margin-top:16px}form[hidden]{display:none}
+:root{color-scheme:light;font-family:system-ui,sans-serif;color:#17212f;background:#fff;--muted:#465467;--surface:#fff;--border:#728197;--notice:#edf3fc;--success:#14532d;--error:#991b1b}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;color:#f1f5f9;background:#161d29;--muted:#cbd5e1;--surface:#202b3b;--border:#94a3b8;--notice:#25374f;--success:#bbf7d0;--error:#fecaca}}
+*{box-sizing:border-box}body{margin:0;padding:20px}main{max-width:560px;margin:auto}h2{font-size:20px;margin:0 0 8px}p{line-height:1.5}.muted{font-size:13px;color:var(--muted)}
+dl{display:grid;grid-template-columns:90px 1fr;gap:8px;margin:20px 0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}label{display:block;font-size:14px;margin-top:14px}
+input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:inherit;margin-top:6px}input::placeholder{color:var(--muted);opacity:1}button{font:inherit;font-weight:600;width:100%;padding:12px;border:0;border-radius:9px;color:#fff;background:#145ac2;margin-top:20px;cursor:pointer}button:disabled{opacity:.65;cursor:wait}#status{min-height:48px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--notice);overflow-wrap:anywhere}#status[data-state="success"]{color:var(--success)}#status[data-state="error"]{color:var(--error)}[hidden]{display:none!important}
 </style>
 <main><h2>Enroll device</h2><p class="muted">Secure Firewall Assistant · private local credentials</p>
 <p id="status" role="status" aria-live="polite">Connecting to the enrollment helper…</p>
@@ -18,18 +19,15 @@ input{width:100%;font:inherit;padding:11px;border:1px solid #8994a3;border-radiu
 <form id="form" autocomplete="off" hidden>
 <label>Password<input id="password" type="password" required maxlength="4096" autocomplete="new-password"></label>
 <label>Repeat password<input id="repeat" type="password" required maxlength="4096" autocomplete="new-password"></label>
-<details><summary>Domain and certificate</summary>
-<label>FMC domain (optional)<input id="domain" maxlength="256" placeholder="Discover automatically"></label>
-<label>Trusted CA file (optional)<input id="ca" maxlength="2048" placeholder="Full path to a PEM bundle on this computer"></label></details>
 <button id="save" type="submit">Save enrollment</button>
 <p class="muted">Password goes directly to your computer’s Keychain or Credential Manager. It is never sent in chat or an MCP tool call. This form expires after 10 minutes.</p>
-</form></main>
+</form><button id="check" type="button" hidden>Check enrollment status</button></main>
 <script>
 (() => {
   'use strict';
   const el=id=>document.getElementById(id);
-  const status=text=>{el('status').textContent=text};
-  let session=null, expired=false, initialized=false, expiryTimer=null;
+  const status=(text,state='info')=>{el('status').textContent=text;el('status').dataset.state=state;el('status').scrollIntoView({block:'nearest'})};
+  let session=null, expired=false, initialized=false, expiryTimer=null, requestTimer=null, savedAlias=null, savedKind=null;
   const send=(method,params,id)=>window.parent.postMessage({jsonrpc:'2.0',method,params,...(id===undefined?{}:{id})},'*');
   const clear=()=>{el('password').value='';el('repeat').value=''};
   function prepare(alias,address,username){
@@ -54,12 +52,33 @@ input{width:100%;font:inherit;padding:11px;border:1px solid #8994a3;border-radiu
     session=value;
     el('deviceForm').hidden=true;
     for(const id of ['alias','address','username']) el(id).textContent=value[id]||'';
-    el('domain').value=value.domain||'';
+    savedAlias=value.alias;savedKind=value.kind;
     const remaining=value.expires*1000-Date.now();
     if(remaining<=0){status('This form expired. Ask for a new enrollment form.');return}
     el('form').hidden=false;status('Enter the device password below.');
     expiryTimer=setTimeout(()=>{expired=true;clear();el('form').hidden=true;session=null;status('This form expired. Ask for a new enrollment form.')},remaining);
     send('ui/notifications/size-changed',{width:560,height:650});
+  }
+  function publicData(result){
+    if(result?.structuredContent)return result.structuredContent;
+    try{return JSON.parse(result?.content?.find(c=>c.type==='text')?.text||'{}')}catch{return {}}
+  }
+  function checkStatus(){
+    if(!session)return;
+    el('check').hidden=false;el('check').disabled=true;
+    status('Checking whether enrollment was saved…');
+    send('tools/call',{name:'enrollment_status',arguments:{enrollment_id:new URL(session.endpoint).pathname.split('/').pop()}},11);
+    clearTimeout(requestTimer);
+    requestTimer=setTimeout(()=>{el('check').disabled=false;status('Enrollment status could not be confirmed. Return to chat and ask to check enrollment status before retrying.','error')},15000);
+  }
+  function enrolled(){
+    clear();clearTimeout(expiryTimer);el('form').hidden=true;el('check').hidden=true;
+    session=null;
+    status('Enrollment saved successfully for '+savedAlias+'. Checking FMC connectivity…','success');
+    send('ui/update-model-context',{content:[{type:'text',text:'Enrollment saved for '+savedAlias+'. Credential values are private.'}]},2);
+    if(savedKind==='ftd'){status('Enrollment saved successfully for '+savedAlias+'.','success');return}
+    send('tools/call',{name:'connect_fmc',arguments:{target:savedAlias}},12);
+    requestTimer=setTimeout(()=>status('Enrollment saved successfully for '+savedAlias+'. Connectivity has not been confirmed. Return to chat to check the connection.','success'),15000);
   }
   window.addEventListener('message',event=>{
     if(event.source!==window.parent || event.data?.jsonrpc!=='2.0')return;
@@ -79,10 +98,24 @@ input{width:100%;font:inherit;padding:11px;border:1px solid #8994a3;border-radiu
       }
     }
     if(message.id===10){el('prepare').disabled=false;if(message.error || message.result?.isError){status('Could not prepare enrollment. Check the device name and address.');return}accept(message.result)}
+    if(message.id===11){
+      clearTimeout(requestTimer);el('check').disabled=false;
+      const data=publicData(message.result);
+      if(data.status==='enrolled'){enrolled();return}
+      if(data.status==='saving'){status('Saving is still in progress. Complete the OS credential-store prompt, then check status again.');return}
+      if(data.status==='waiting'){el('save').disabled=false;el('check').hidden=true;status('Enrollment has not been saved yet. If an OS credential-store prompt is open, complete it and check status again before retrying.','error');return}
+      el('form').hidden=true;status('Enrollment could not be confirmed or the form expired. Return to chat and request a fresh form.','error');
+    }
+    if(message.id===12){
+      clearTimeout(requestTimer);
+      const data=publicData(message.result);
+      const connected=!message.error && !message.result?.isError && !!data.server_version && data.target===savedAlias;
+      status(connected ? 'Enrollment saved successfully for '+savedAlias+'. FMC connection verified.' : 'Enrollment saved successfully for '+savedAlias+'. FMC connection could not be verified. Return to chat for connection details.',connected?'success':'error');
+    }
     if(message.method==='ui/notifications/tool-result')accept(message.params);
-    if(message.method==='ui/resource-teardown'){clear();session=null;clearTimeout(expiryTimer);window.parent.postMessage({jsonrpc:'2.0',id:message.id,result:{}},'*')}
+    if(message.method==='ui/resource-teardown'){clear();session=null;clearTimeout(expiryTimer);clearTimeout(requestTimer);window.parent.postMessage({jsonrpc:'2.0',id:message.id,result:{}},'*')}
   });
-  send('ui/initialize',{appInfo:{name:'Secure Firewall enrollment',version:'0.3.1'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
+  send('ui/initialize',{appInfo:{name:'Secure Firewall enrollment',version:'0.3.2'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
   // Compatibility path for hosts that deliver the initial result before bridge setup.
   const initial=window.openai?.toolResponseMetadata;
   if(initial)accept(initial.call_tool_result||initial.mcp_tool_result||initial);
@@ -91,19 +124,24 @@ input{width:100%;font:inherit;padding:11px;border:1px solid #8994a3;border-radiu
     event.preventDefault();
     if(!session || expired)return;
     if(!el('password').value || el('password').value!==el('repeat').value){clear();status('Passwords must be nonempty and match.');return}
-    const body=JSON.stringify({password:el('password').value,repeat:el('repeat').value,domain:el('domain').value,ca:el('ca').value});
-    clear();el('save').disabled=true;status('Saving to your local credential store…');
+    const body=JSON.stringify({password:el('password').value,repeat:el('repeat').value});
+    clear();el('save').disabled=true;status('Saving to your local credential store… Complete any Keychain or Credential Manager prompt on this computer.');
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),20000);
     try{
-      const response=await fetch(session.endpoint,{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',headers:{'Content-Type':'application/json','X-SFA-Enrollment':session.authorization},body});
+      const response=await fetch(session.endpoint,{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',signal:controller.signal,headers:{'Content-Type':'application/json','X-SFA-Enrollment':session.authorization},body});
       const result=await response.json();
-      if(!response.ok || !result.ok){status(result.message||'Enrollment failed. Enter the password again to retry.');return}
-      el('form').hidden=true;clearTimeout(expiryTimer);session=null;status('Device enrolled. Return to chat to check connectivity.');
-      // Only safe completion metadata crosses the host bridge, never form input.
-      send('ui/update-model-context',{content:[{type:'text',text:'Enrollment completed for '+result.alias+'. Check connectivity using the saved alias.'}]},2);
+      if(!response.ok || !result.ok){
+        status(result.message||'Enrollment failed. Enter the password again to retry.','error');el('save').disabled=false;return;
+      }
+      checkStatus();
     }catch{
-      status('ChatGPT could not reach the local credential helper. No browser window will open. Check local-network permissions or request a fresh form.');
-    }finally{el('save').disabled=false}
+      // A lost response does not establish whether the native store saved it.
+      el('check').hidden=false;
+      status('The save response did not arrive. Check enrollment status below before retrying. If it is still waiting, check local-network permissions and any OS credential-store prompt.','error');
+    }finally{clearTimeout(timeout)}
   });
-  window.addEventListener('pagehide',()=>{clear();session=null});
+  el('check').addEventListener('click',checkStatus);
+  window.addEventListener('pagehide',()=>{clear();session=null;clearTimeout(expiryTimer);clearTimeout(requestTimer)});
 })();
 </script></html>
