@@ -1,5 +1,14 @@
 # Validation report — 19 October 2026
 
+## 0.2.0 enrollment update
+
+- 81 automated tests pass on macOS, including loopback form submission, cross-origin/Host/CSRF rejection, expiry, one-use completion, mismatched password and missing CA failures, existing-alias protection, and credential omission from responses/logs/inventory. Tests use synthetic credentials and a memory store.
+- Ruff and portable package checks pass. The new release is prepared through the existing installer, preserving private enrollment. MCP now exposes 15 tools, adding `start_enrollment` and `enrollment_status`.
+- Actual password entry and native credential-store enrollment require the user; live FMC access and Windows execution remain environment checks. The local enrollment form is not a native ChatGPT credential dialog.
+- Version 0.1.0 was installed and enabled by the local plugin manager; its 13 tools and health/list calls were verified from the installed cache launch manifest. Work interface activation was not observed.
+
+## Original 0.1.0 build report
+
 Build: **0.1.0**, tested locally on **macOS Apple Silicon**, Python **3.12.12**,
 uv **0.10.4**. Tests use synthetic devices and in-memory synthetic credentials;
 no user's native credential store or lab device was accessed.
@@ -46,7 +55,7 @@ plugin installer or establish that your actual Work account can import it.
 
 ## Pilot procedure
 
-1. Install on one macOS and one Windows machine. Confirm all 13 tools are present
+1. Install on one macOS and one Windows machine. Confirm all 15 tools are present
    in a new local Work task and `assistant_health` returns the expected release.
 2. Enroll one lab FMC locally, check TLS/login/domain/version, and compare a
    known network object and policy against expected saved configuration.
@@ -59,7 +68,5 @@ plugin installer or establish that your actual Work account can import it.
    chosen disposable lab device, submit the separate deployment action, and
    verify job completion and any requested runtime behavior.
 
-No device configuration or deployment was performed during this build. No
-plugin was uploaded to an account, installed in the user's current desktop,
-published publicly, or connected to a workspace marketplace. Repository hosting
+No device configuration or deployment was performed during this build. The original build did not install a plugin; subsequent local installation is recorded above. No plugin was uploaded to an account, published publicly, or connected to a workspace marketplace. Repository hosting
 is maintained separately; see [REPOSITORIES.md](REPOSITORIES.md).

@@ -36,7 +36,7 @@ class Assistant:
             client.close()
 
     def health(self) -> dict:
-        return {"version": "0.1.0", "devices_enrolled": len(self.state.aliases()),
+        return {"version": "0.2.0", "devices_enrolled": len(self.state.aliases()),
                 "schema": self.catalog.provenance, "network_access_tested": False,
                 "native_store": "macOS Keychain or Windows Credential Manager (opened only when needed)",
                 "runtime_writes": "deployment tool only; special operational APIs disabled",

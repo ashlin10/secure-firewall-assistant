@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Start device enrollment from chat using a short-lived loopback form. Passwords go directly to the native credential store, outside model/tool input.
+- Added enrollment status tool; existing inventories and credentials are preserved.
+
+
 ## 0.1.0
 
 - Desktop-only portable plugin and reusable skill for macOS/Windows local Work.

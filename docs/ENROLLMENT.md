@@ -1,5 +1,25 @@
 # Private enrollment
 
+## Enroll from chat
+
+Ask: “Enroll FMC lab-fmc-1 at https://my-fmc using username api-user.”
+The `start_enrollment` tool returns a local form, prefilled with those details.
+Open it on the same computer as the local Work chat, enter and repeat the
+password, optionally set the exact domain and trusted CA bundle path, and select
+**Save enrollment**. The form saves to the native credential store and private
+inventory. Return to chat and say “done”; the assistant checks enrollment status
+and connects to the FMC. The form cannot replace an existing alias.
+
+The form listens only on 127.0.0.1, expires after ten minutes, and stops after
+one successful enrollment. It rejects cross-origin submissions and unexpected
+Host headers, uses a random one-time path and CSRF value, loads no third-party
+assets, and never returns or logs submitted passwords. Do not paste passwords
+into chat or let browser automation inspect the form after typing begins.
+The loopback connection uses local HTTP; FMC connections still require verified
+HTTPS. This is a local browser form, not a built-in ChatGPT credential dialog.
+
+## Terminal alternative
+
 Run these commands yourself in your terminal, from the installed release
 directory printed by setup. Replace example addresses with your own values.
 They are illustrative documentation addresses, not enrolled devices.

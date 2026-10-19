@@ -25,7 +25,7 @@ runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.1.0", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.2.0", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     read_annotation = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
     write_annotation = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True)
@@ -65,6 +65,17 @@ def build_server(assistant: Assistant | None = None):
     @expose("list_devices", "List private enrolled aliases and kinds. Does not expose passwords or addresses.")
     def devices() -> dict:
         return {"devices": assistant.state.aliases()}
+
+    @expose("start_enrollment", "Prepare a short-lived local enrollment form. Takes device details only, never a password. User enters credentials directly in the local form.", write=True)
+    def enroll(kind: Literal["fmc", "ftd"], alias: str, address: str, username: str,
+               domain: str | None = None) -> dict:
+        from .enrollment import start
+        return start(assistant.state, kind, alias, address, username, domain)
+
+    @expose("enrollment_status", "Read enrollment status only; never returns credential values or form contents.")
+    def enrollment_status(enrollment_id: str) -> dict:
+        from .enrollment import status
+        return status(assistant.state, enrollment_id)
 
     @expose("connect_fmc", "Authenticate internally and inspect the enrolled FMC domain and software version.")
     def connect(target: str) -> dict:

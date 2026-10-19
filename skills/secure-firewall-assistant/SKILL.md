@@ -20,8 +20,7 @@ curl commands, browser actions, or a shell that reads credentials.
    lookups, validation, writes, and read-back. Proceed without repetitive
    confirmations. Ask only if target, domain, affected resources, expectations,
    or requested changes are materially ambiguous.
-4. Connect with `connect_fmc`. Credentials are enrolled through the local
-   management utility, not chat. Never ask for passwords, authentication headers,
+4. Connect with `connect_fmc`. For a new device, use `start_enrollment` with only device details and give the user its local URL (or open it in a visible local browser). Hand off password entry completely: never fill, inspect, screenshot, or read that form once the user starts entering credentials. Do not automate the submit. Use `enrollment_status` to check completion, then connect. The form expires after ten minutes. Credentials are entered locally, never in chat. Never ask for passwords, authentication headers,
    private keys, or token values in a message or tool call. Refer to
    `../../docs/ENROLLMENT.md` when enrollment or certificate trust is missing.
 
