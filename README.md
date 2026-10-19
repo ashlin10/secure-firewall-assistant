@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.3.0
+# Secure Firewall Assistant 0.3.1
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and

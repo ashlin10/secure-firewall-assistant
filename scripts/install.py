@@ -99,6 +99,12 @@ def install(source: Path, home: Path | None = None, uv_binary: str | None = None
                          "secure-firewall-assistant", "serve"]
     transport["cwd"] = str(destination)
     write_json(destination / "mcp.json", mcp)
+    # Older local desktop loaders still require the compatibility launch file.
+    # Derive it from the rewritten portable launch entry so both use this release.
+    legacy = json.loads(json.dumps(mcp["mcpServers"]))
+    for value in legacy.values():
+        value.pop("type", None)
+    write_json(destination / ".mcp.json", {"mcpServers": legacy})
     # No local credentials are enrolled or read by installation or health checks.
     runner([uv_binary, "sync", "--project", str(destination), "--frozen", "--no-dev"], check=True)
     environment = {**os.environ, "SFA_DATA_DIR": str(destination / ".installation-check")}

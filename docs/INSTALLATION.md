@@ -87,3 +87,30 @@ plugin's entry or reset the entire marketplace file.
 This source-based installer is not a signed/notarized native application. A
 managed organization may require approved packaging or signing before rollout.
 No signing identity or Windows certificate is included.
+
+## If skills load but tools do not
+
+A successful plugin installation or visible skill does not prove that the
+bundled MCP server was discovered. Check `codex mcp list --json` and inspect only
+the secure-firewall entry. This machine loaded portable plugin skills while
+omitting the bundled server, including after adding compatibility manifests.
+
+The verified local workaround is explicit registration using the installed
+release directory printed by setup. Substitute that exact directory below:
+
+```sh
+codex mcp add secure-firewall -- /absolute/path/to/uv run --project /installed/release/directory --frozen --no-dev --offline secure-firewall-assistant serve
+```
+
+Keep the installed plugin enabled for its skill. This additional local server
+registration supplies the tools and MCP App resource; it does not copy or expose
+credentials. Restart the desktop app and use a fresh local chat to load the new
+connection. A current chat cannot acquire tool definitions by printing a tool
+response from an external test process. Confirm the form actually renders before
+claiming enrollment succeeded. The standard MCP status `auth_status: unsupported`
+for this local stdio server refers to MCP OAuth, not to the FMC password store.
+
+This registration pins a release path. After an upgrade, repeat it with the new
+installed release directory. If a future desktop version discovers the bundled
+server automatically, remove only the duplicate standalone registration with
+`codex mcp remove secure-firewall`; keep the plugin installed.

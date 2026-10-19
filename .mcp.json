@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "secure-firewall": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${PLUGIN_ROOT}",
+        "--frozen",
+        "--no-dev",
+        "--offline",
+        "secure-firewall-assistant",
+        "serve"
+      ],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

@@ -21,4 +21,4 @@ def test_archives_are_valid_scoped_and_reproducible(tmp_path):
 
 
 def test_native_manifests_and_skill_validate():
-    assert packager.validate() == "0.3.0"
+    assert packager.validate() == "0.3.1"

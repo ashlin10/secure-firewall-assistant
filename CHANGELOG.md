@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Include Codex compatibility manifests and keep both MCP launch files aligned during installation.
+- Document explicit local MCP registration for desktop installations that load skills without the bundled server.
+
+
 ## 0.3.0
 
 - Replaced browser enrollment with an embedded MCP App card and plugin UI entrypoint.

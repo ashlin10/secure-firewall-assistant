@@ -14,7 +14,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 TOP = {"plugin.json", "mcp.json", "pyproject.toml", "uv.lock", ".python-version", "README.md",
        "CHANGELOG.md", "CONTRIBUTING.md", "NOTICE.md", "Install.command", "Manage.command", "Install.ps1", "Manage.ps1"}
-DIRECTORIES = {"src", "skills", "docs", "scripts"}
+TOP.add(".mcp.json")
+DIRECTORIES = {"src", "skills", "docs", "scripts", ".codex-plugin"}
 EXCLUDED_PARTS = {"__pycache__", ".venv", ".pytest_cache", ".ruff_cache"}
 
 
@@ -28,6 +29,13 @@ def validate(root=ROOT):
     assert len(interface["shortDescription"]) <= 30
     assert plugin["extensions"]["com.openai"]["requires_local_executor"] is True
     version = plugin["version"]
+    compatibility = json.loads((root / ".codex-plugin/plugin.json").read_text())
+    assert compatibility["name"] == plugin["name"] and compatibility["version"] == version
+    assert compatibility["mcpServers"] == "./.mcp.json"
+    portable = json.loads((root / "mcp.json").read_text())["mcpServers"]
+    legacy = json.loads((root / ".mcp.json").read_text())["mcpServers"]
+    assert legacy == {name: {k: v for k, v in fields.items() if k != "type"}
+                      for name, fields in portable.items()}
     assert re.fullmatch(r"\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?", version)
     assert tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"] == version
     assert f'__version__ = "{version}"' in (root / "src/secure_firewall_assistant/__init__.py").read_text()

@@ -49,6 +49,8 @@ def test_install_upgrade_preserves_catalog_and_private_files(tmp_path):
     transport = json.loads((Path(second["release_directory"]) / "mcp.json").read_text())["mcpServers"]["secure-firewall"]
     assert transport["command"] == str(Path("/fixture/uv").resolve())
     assert second["release_directory"] in transport["args"]
+    legacy = json.loads((Path(second["release_directory"]) / ".mcp.json").read_text())["mcpServers"]["secure-firewall"]
+    assert legacy == {k: v for k, v in transport.items() if k != "type"}
     assert len(list(marketplace.parent.glob("marketplace.backup-*"))) == 2
     assert len(calls) == 4
 

@@ -1,5 +1,11 @@
 # Validation report — 19 October 2026
 
+## 0.3.1 local connection correction
+
+- The installed desktop/CLI loaded the plugin skill but omitted the bundled server from `codex mcp list`, even with compatibility files. Explicit `codex mcp add secure-firewall` now registers the installed stdio helper and reports it enabled.
+- Compatibility manifests and launch-file parity are checked; actual in-chat tool discovery and UI rendering still require a refreshed host session. External Python-client success alone is not host integration success.
+- No password was obtained, and no live enrollment was completed by this correction.
+
 ## 0.3.0 embedded enrollment update
 
 - 83 automated tests pass on macOS, including the MCP resource/tool metadata round trip, JSON loopback submission, exact Origin/Host/authorization rejection, CORS preflight, expiry/replay protection, and password omission from responses, inventory, and logs.

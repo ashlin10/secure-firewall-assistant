@@ -82,7 +82,7 @@ input{width:100%;font:inherit;padding:11px;border:1px solid #8994a3;border-radiu
     if(message.method==='ui/notifications/tool-result')accept(message.params);
     if(message.method==='ui/resource-teardown'){clear();session=null;clearTimeout(expiryTimer);window.parent.postMessage({jsonrpc:'2.0',id:message.id,result:{}},'*')}
   });
-  send('ui/initialize',{appInfo:{name:'Secure Firewall enrollment',version:'0.3.0'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
+  send('ui/initialize',{appInfo:{name:'Secure Firewall enrollment',version:'0.3.1'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
   // Compatibility path for hosts that deliver the initial result before bridge setup.
   const initial=window.openai?.toolResponseMetadata;
   if(initial)accept(initial.call_tool_result||initial.mcp_tool_result||initial);
