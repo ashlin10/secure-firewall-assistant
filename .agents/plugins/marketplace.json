@@ -1,0 +1,12 @@
+{
+  "name": "secure-firewall-team",
+  "interface": {"displayName": "Secure Firewall team"},
+  "plugins": [
+    {
+      "name": "secure-firewall-assistant",
+      "source": {"source": "local", "path": "./"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"},
+      "category": "Developer Tools"
+    }
+  ]
+}

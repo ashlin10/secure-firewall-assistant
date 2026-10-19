@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "secure-firewall": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--project", "${PLUGIN_ROOT}", "--frozen", "--no-dev", "--offline", "secure-firewall-assistant", "serve"],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+name: Validate local plugin
+on:
+  pull_request:
+  push:
+    branches: [main, release]
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.4'
+      - run: uv sync --frozen
+      - run: uv run --offline ruff check .
+      - run: uv run --offline pytest --junitxml=test-results.xml
+      - run: uv run --offline python scripts/package.py --output dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: secure-firewall-assistant-${{ matrix.os }}
+          path: |
+            dist/*
+            test-results.xml

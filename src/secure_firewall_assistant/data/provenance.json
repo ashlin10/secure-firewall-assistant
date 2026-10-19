@@ -1,0 +1,20 @@
+{
+  "source_filename": "merged_oas3_10_5_0_0.json",
+  "source_sha256": "0ae1d4c207415fae1506b34782caa0196af14fec90d7696392a5a7e9ac25304f",
+  "sanitized_sha256": "d98324f6e4334cda59fc23adfb783a8b054553c18c9c803d4f86672ac7d1dd32",
+  "openapi": "3.0.1",
+  "info_version": "1.0.0",
+  "declared_device_version": null,
+  "paths": 889,
+  "operations": 1623,
+  "schemas": 4052,
+  "unresolved_references": [
+    "#/components/schemas/HADCStateUnavailableResponse"
+  ],
+  "transformations": [
+    "Removed all example/examples and code sample fields",
+    "Removed non-structural sample credential values repeated elsewhere in the document",
+    "Replaced non-public-documentation example URLs",
+    "No missing definitions fabricated; affected response validation reports a warning"
+  ]
+}
