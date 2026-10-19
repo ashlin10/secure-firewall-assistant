@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Replaced browser enrollment with an embedded MCP App card and plugin UI entrypoint.
+- Passwords travel directly to a one-use, origin-restricted loopback endpoint; never through MCP calls, model context, or widget state.
+- Hosts without embedded UI/local-network support fail closed without opening a browser.
+
+
 ## 0.2.0
 
 - Start device enrollment from chat using a short-lived loopback form. Passwords go directly to the native credential store, outside model/tool input.

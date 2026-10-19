@@ -6,7 +6,7 @@ from typing import Literal
 
 from filelock import Timeout
 from mcp.server import MCPServer
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, ToolAnnotations
 
 from .errors import AssistantError
 from .service import Assistant
@@ -25,17 +25,27 @@ runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.2.0", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.3.0", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
+    from .enrollment_ui import MIME, EnrollmentUI
+    enrollment = EnrollmentUI(assistant.state, assistant.secrets)
+    atexit.register(enrollment.close)
+
+    @server.resource(enrollment.uri, mime_type=MIME, meta=enrollment.resource_meta)
+    def enrollment_resource() -> str:
+        return enrollment.html()
     read_annotation = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
     write_annotation = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True)
 
-    def expose(name, description, write=False):
+    def expose(name, description, write=False, meta=None):
         def decorate(function):
             @functools.wraps(function)
             def wrapped(*args, **kwargs):
                 try:
-                    result = assistant.redactor.clean(function(*args, **kwargs))
+                    result = function(*args, **kwargs)
+                    if isinstance(result, CallToolResult):
+                        return result
+                    result = assistant.redactor.clean(result)
                     encoded = json.dumps(result, ensure_ascii=False)
                     if len(encoded) > 48000:
                         # Full redacted evidence remains private on this computer.
@@ -55,7 +65,7 @@ def build_server(assistant: Assistant | None = None):
                     # Do not serialize exception text: transports/libraries may embed credentials.
                     return {"ok": False, "error": {"code": "internal_error", "message": "The operation failed locally. Run the health check and report the operation ID without credentials."}}
             return server.tool(name=name, description=description,
-                               annotations=write_annotation if write else read_annotation)(wrapped)
+                               annotations=write_annotation if write else read_annotation, meta=meta)(wrapped)
         return decorate
 
     @expose("assistant_health", "Inspect local package/schema status without reading credentials or contacting devices.")
@@ -66,16 +76,18 @@ def build_server(assistant: Assistant | None = None):
     def devices() -> dict:
         return {"devices": assistant.state.aliases()}
 
-    @expose("start_enrollment", "Prepare a short-lived local enrollment form. Takes device details only, never a password. User enters credentials directly in the local form.", write=True)
-    def enroll(kind: Literal["fmc", "ftd"], alias: str, address: str, username: str,
+    @expose("start_enrollment", "Show a private enrollment form inside ChatGPT. Device details only; never pass a password. With no details, show the device form. Do not open a browser.", write=True,
+            meta={"ui": {"resourceUri": enrollment.uri}, "openai/outputTemplate": enrollment.uri,
+                  "openai/ui": {"entrypoints": [{"type": "global"}, {"type": "thread"}]}})
+    def enroll(kind: Literal["fmc", "ftd"] = "fmc", alias: str = "", address: str = "", username: str = "",
                domain: str | None = None) -> dict:
-        from .enrollment import start
-        return start(assistant.state, kind, alias, address, username, domain)
+        if not alias and not address and not username:
+            return {"status": "enter_device_details", "next_step": "Use the embedded enrollment form; do not open a browser."}
+        return enrollment.start(kind, alias, address, username, domain)
 
     @expose("enrollment_status", "Read enrollment status only; never returns credential values or form contents.")
     def enrollment_status(enrollment_id: str) -> dict:
-        from .enrollment import status
-        return status(assistant.state, enrollment_id)
+        return enrollment.status(enrollment_id)
 
     @expose("connect_fmc", "Authenticate internally and inspect the enrolled FMC domain and software version.")
     def connect(target: str) -> dict:

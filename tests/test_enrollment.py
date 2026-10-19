@@ -1,99 +1,134 @@
-import threading
+import asyncio
+import json
 import time
 
 import httpx
 import pytest
+from mcp import Client
 
-from secure_firewall_assistant.enrollment import EnrollmentServer, job_path, status
-from secure_firewall_assistant.errors import AssistantError
-from secure_firewall_assistant.state import Device, State, atomic_json
+from secure_firewall_assistant.enrollment_ui import MIME, SANDBOX_ORIGIN, EnrollmentUI
+from secure_firewall_assistant.server import build_server
+from secure_firewall_assistant.state import State
+
+
+class Store:
+    def __init__(self):
+        self.values = {}
+
+    def set(self, reference, value):
+        self.values[reference] = value
 
 
 @pytest.fixture
 def form(tmp_path):
-    state = State(tmp_path / "config", tmp_path / "data")
-    class Store:
-        def __init__(self):
-            self.values = {}
-
-        def set(self, reference, value):
-            self.values[reference] = value
+    state = State(tmp_path / 'config', tmp_path / 'data')
     store = Store()
-    device = Device("fixture", "fmc", "https://fmc.example.invalid:12202", "tester", "fixture-auth")
-    server = EnrollmentServer(device, state, store)
-    worker = threading.Thread(target=server.serve_forever, daemon=True)
-    worker.start()
-    yield server, state, store
-    server.shutdown()
-    server.server_close()
-    worker.join()
+    ui = EnrollmentUI(state, store)
+    result = ui.start('fmc', 'fixture', 'https://fmc.example.invalid:12202', 'tester')
+    metadata = result.model_dump(by_alias=True)['_meta']['enrollment']
+    yield ui, metadata, state, store
+    ui.close()
 
 
-def submit(server, **updates):
-    fields = {"csrf": server.nonce, "password": "synthetic-form-value", "repeat": "synthetic-form-value",
-              "domain": "Global", "ca": ""}
-    fields.update(updates)
-    return fields
+def headers(meta):
+    return {'Origin': SANDBOX_ORIGIN, 'X-SFA-Enrollment': meta['authorization']}
 
 
-def test_local_form_saves_once_without_disclosing_secret(form, capsys):
-    server, state, store = form
-    url = server.origin + server.form_path
-    page = httpx.get(url)
-    assert page.status_code == 200 and 'type="password"' in page.text
-    assert page.headers["cache-control"] == "no-store"
-    assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
-    result = httpx.post(url, data=submit(server), headers={"Origin": server.origin})
-    assert result.status_code == 200
-    assert "synthetic-form-value" not in result.text
-    assert store.values == {"fixture-auth": "synthetic-form-value"}
-    assert "synthetic-form-value" not in state.inventory_path.read_text()
-    assert state.device("fixture").domain == "Global"
-    assert httpx.get(url).status_code == 404
-    assert httpx.post(url, data=submit(server), headers={"Origin": server.origin}).status_code == 403
-    assert "synthetic-form-value" not in str(capsys.readouterr())
+def fields(**updates):
+    return {'password': 'synthetic-inline-value', 'repeat': 'synthetic-inline-value',
+            'domain': 'Global', 'ca': '', **updates}
 
 
-@pytest.mark.parametrize("headers,changes", [
-    ({"Origin": "https://evil.example"}, {}),
-    ({}, {}),
-    ({"Host": "evil.example"}, {}),
-    ({}, {"csrf": "wrong"}),
+def test_inline_completion_is_private_and_single_use(form, capsys):
+    ui, meta, state, store = form
+    response = httpx.post(meta['endpoint'], json=fields(), headers=headers(meta))
+    assert response.status_code == 200
+    assert response.headers['Access-Control-Allow-Origin'] == SANDBOX_ORIGIN
+    assert response.headers['Cache-Control'] == 'no-store'
+    assert store.values == {'fixture-auth': 'synthetic-inline-value'}
+    assert 'synthetic-inline-value' not in response.text
+    assert 'synthetic-inline-value' not in state.inventory_path.read_text()
+    assert state.device('fixture').domain == 'Global'
+    assert ui.status(meta['endpoint'].rsplit('/', 1)[1])['status'] == 'enrolled'
+    assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 403
+    assert 'synthetic-inline-value' not in str(capsys.readouterr())
+
+
+@pytest.mark.parametrize('change', [
+    {'Origin': 'https://evil.example'}, {'Origin': 'null'}, {'Host': 'evil.example'},
+    {'X-SFA-Enrollment': 'wrong'}, {'Origin': 'http://localhost'},
 ])
-def test_forged_requests_never_store_credentials(form, headers, changes):
-    server, state, store = form
-    actual = {"Origin": server.origin, **headers}
-    if not headers and not changes:
-        actual = {}
-    response = httpx.post(server.origin + server.form_path, data=submit(server, **changes), headers=actual)
+def test_forged_origin_host_and_authorization_fail_closed(form, change):
+    ui, meta, state, store = form
+    response = httpx.post(meta['endpoint'], json=fields(), headers={**headers(meta), **change})
     assert response.status_code == 403
-    assert store.values == {} and state.aliases() == []
+    assert state.aliases() == [] and store.values == {}
+    if change.get('Origin') and change['Origin'] != SANDBOX_ORIGIN:
+        assert 'Access-Control-Allow-Origin' not in response.headers
 
 
-def test_password_mismatch_and_missing_ca_leave_enrollment_empty(form):
-    server, state, store = form
-    for changes in ({"repeat": "different"}, {"ca": "/nonexistent/ca.pem"}):
-        result = httpx.post(server.origin + server.form_path, data=submit(server, **changes),
-                            headers={"Origin": server.origin})
-        assert result.status_code == 400
-        assert "synthetic-form-value" not in result.text
-        assert store.values == {} and state.aliases() == []
+def test_preflight_is_exact_and_no_browser_page_exists(form):
+    ui, meta, state, store = form
+    response = httpx.options(meta['endpoint'], headers={'Origin': SANDBOX_ORIGIN,
+        'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,x-sfa-enrollment'})
+    assert response.status_code == 200
+    assert response.headers['Access-Control-Allow-Private-Network'] == 'true'
+    for change in [{'Access-Control-Request-Method': 'DELETE'}, {'Access-Control-Request-Headers': 'x-arbitrary'}]:
+        assert httpx.options(meta['endpoint'], headers={'Origin': SANDBOX_ORIGIN,
+            'Access-Control-Request-Method': 'POST', **change}).status_code == 403
+    assert httpx.get(meta['endpoint']).status_code == 404
 
 
-def test_expiry_and_existing_alias_do_not_overwrite(form):
-    server, state, store = form
-    state.save_device(server.device)
-    result = httpx.post(server.origin + server.form_path, data=submit(server), headers={"Origin": server.origin})
-    assert result.status_code == 409 and store.values == {}
-    server.expires = time.time() - 1
-    assert httpx.get(server.origin + server.form_path).status_code == 404
+def test_invalid_fields_expiry_and_existing_alias_leave_credentials_untouched(form):
+    ui, meta, state, store = form
+    for values in [fields(repeat='different'), fields(ca='/nonexistent/ca.pem'), fields(password=[]), {'password': 'x'}]:
+        response = httpx.post(meta['endpoint'], json=values, headers=headers(meta))
+        assert response.status_code == 400
+        assert 'synthetic-inline-value' not in response.text
+    identifier = meta['endpoint'].rsplit('/', 1)[1]
+    state.save_device(ui.sessions[identifier]['device'])
+    assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 409
+    ui.sessions[identifier]['expires'] = time.time() - 1
+    assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 403
+    assert ui.status(identifier)['status'] == 'expired'
+    assert store.values == {}
 
 
-def test_status_has_only_safe_fields_and_blocks_path_traversal(form):
-    server, state, store = form
-    identifier = "a" * 32
-    atomic_json(job_path(state, identifier), {"device": {"alias": "fixture"}, "status": "waiting",
-                                            "expires": time.time() - 1, "url": "not-returned"})
-    assert status(state, identifier) == {"enrollment_id": identifier, "alias": "fixture", "status": "expired"}
-    with pytest.raises(AssistantError):
-        job_path(state, "../../inventory")
+def test_mcp_card_metadata_and_resource_roundtrip(assistant):
+    async def run():
+        async with Client(build_server(assistant)) as client:
+            tools = (await client.list_tools()).tools
+            descriptor = next(t for t in tools if t.name == 'start_enrollment').model_dump(by_alias=True)
+            assert 'password' not in json.dumps(descriptor['inputSchema']).lower()
+            uri = descriptor['_meta']['ui']['resourceUri']
+            assert descriptor['_meta']['openai/ui']['entrypoints'] == [{'type':'global'}, {'type':'thread'}]
+            resource = (await client.read_resource(uri)).contents[0].model_dump(by_alias=True)
+            assert resource['mimeType'] == MIME
+            assert resource['_meta']['ui']['csp']['resourceDomains'] == []
+            assert len(resource['_meta']['ui']['csp']['connectDomains']) == 1
+            html = resource['text']
+            assert 'type="password"' in html and "'ui/initialize'" in html
+            assert "'ui/notifications/tool-result'" in html
+            assert 'setWidgetState' not in html and 'console.log' not in html and 'window.open(' not in html
+            result = (await client.call_tool('start_enrollment', {
+                'kind':'fmc','alias':'new-fixture','address':'https://example.invalid','username':'tester'})).model_dump(by_alias=True)
+            assert 'endpoint' not in json.dumps(result['content'])
+            assert 'authorization' not in json.dumps(result['structuredContent'])
+            assert result['_meta']['enrollment']['endpoint'].startswith('http://127.0.0.1:')
+            assert result['structuredContent']['status'] == 'waiting_for_private_form'
+            assert 'enrollment_url' not in json.dumps(result)
+            status = await client.call_tool('enrollment_status', {'enrollment_id':result['structuredContent']['enrollment_id']})
+            assert 'waiting' in json.dumps(status.model_dump())
+    asyncio.run(run())
+
+
+def test_card_keeps_password_out_of_host_bridge():
+    import shutil
+    import subprocess
+    from pathlib import Path
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node is needed for the component JavaScript boundary test')
+    root = Path(__file__).resolve().parents[1]
+    subprocess.run([node, str(root / 'tests/card_flow.mjs'),
+                    str(root / 'src/secure_firewall_assistant/enrollment_card.html')], check=True)

@@ -20,9 +20,7 @@ curl commands, browser actions, or a shell that reads credentials.
    lookups, validation, writes, and read-back. Proceed without repetitive
    confirmations. Ask only if target, domain, affected resources, expectations,
    or requested changes are materially ambiguous.
-4. Connect with `connect_fmc`. For a new device, use `start_enrollment` with only device details and give the user its local URL (or open it in a visible local browser). Hand off password entry completely: never fill, inspect, screenshot, or read that form once the user starts entering credentials. Do not automate the submit. Use `enrollment_status` to check completion, then connect. The form expires after ten minutes. Credentials are entered locally, never in chat. Never ask for passwords, authentication headers,
-   private keys, or token values in a message or tool call. Refer to
-   `../../docs/ENROLLMENT.md` when enrollment or certificate trust is missing.
+4. Connect with `connect_fmc`. For new devices use `start_enrollment` with device details only. It returns an embedded MCP App form inside ChatGPT/Codex. Never open a separate browser or return a loopback enrollment URL. The user enters and submits the password directly in the card. Never inspect, screenshot, fill, or automate password inputs. Never ask for credentials in chat or tool arguments. Use `enrollment_status` after the user finishes, then connect. If the card is missing or its local connection is blocked, report the host/UI limitation and refresh/restart requirements. Do not fall back to a browser or terminal unless the user requests that alternative. See `../../docs/ENROLLMENT.md`.
 
 ## Discover, configure, verify
 

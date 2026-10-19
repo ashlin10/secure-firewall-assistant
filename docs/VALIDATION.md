@@ -1,5 +1,13 @@
 # Validation report — 19 October 2026
 
+## 0.3.0 embedded enrollment update
+
+- 83 automated tests pass on macOS, including the MCP resource/tool metadata round trip, JSON loopback submission, exact Origin/Host/authorization rejection, CORS preflight, expiry/replay protection, and password omission from responses, inventory, and logs.
+- A Node-based component simulation verifies bridge initialization, device-details tool calls, direct password submission, password clearing, and no password in any host bridge message. This is not a live ChatGPT rendering test.
+- The UI resource uses the MCP Apps MIME type, a per-process cache URI, exact loopback CSP allowlist, and global/thread plugin entrypoints. Credentials are not an MCP tool parameter. Existing native-store and inventory behavior is reused.
+- Actual in-host rendering, the host sandbox origin, browser private-network permissions, and native credential entry still require a user pilot. Unsupported origins or blocked loopback requests fail closed. No browser enrollment fallback is opened.
+- Windows native execution remains unverified locally. FMC configuration and deployment are unchanged.
+
 ## 0.2.0 enrollment update
 
 - 81 automated tests pass on macOS, including loopback form submission, cross-origin/Host/CSRF rejection, expiry, one-use completion, mismatched password and missing CA failures, existing-alias protection, and credential omission from responses/logs/inventory. Tests use synthetic credentials and a memory store.

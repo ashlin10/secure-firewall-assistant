@@ -1,22 +1,42 @@
 # Private enrollment
 
-## Enroll from chat
+## Enroll inside ChatGPT or Codex
 
 Ask: “Enroll FMC lab-fmc-1 at https://my-fmc using username api-user.”
-The `start_enrollment` tool returns a local form, prefilled with those details.
-Open it on the same computer as the local Work chat, enter and repeat the
-password, optionally set the exact domain and trusted CA bundle path, and select
-**Save enrollment**. The form saves to the native credential store and private
-inventory. Return to chat and say “done”; the assistant checks enrollment status
-and connects to the FMC. The form cannot replace an existing alias.
+`start_enrollment` returns an **embedded MCP App card inside the conversation**,
+not a browser URL. Enter and repeat the password in that card, optionally set
+an exact domain and local CA bundle path, then select **Save enrollment**.
+The password goes directly from the card to a short-lived loopback endpoint and
+then to Keychain/Credential Manager. Return to chat and say “done” to check
+connectivity. Existing aliases cannot be overwritten through the form.
 
-The form listens only on 127.0.0.1, expires after ten minutes, and stops after
-one successful enrollment. It rejects cross-origin submissions and unexpected
-Host headers, uses a random one-time path and CSRF value, loads no third-party
-assets, and never returns or logs submitted passwords. Do not paste passwords
-into chat or let browser automation inspect the form after typing begins.
-The loopback connection uses local HTTP; FMC connections still require verified
-HTTPS. This is a local browser form, not a built-in ChatGPT credential dialog.
+You can also open **Secure Firewall enrollment** through the plugin's app
+entrypoint, enter the FMC name/address/username, select **Continue**, then save
+the credential. This uses ChatGPT's plugin UI, without a browser window.
+
+Security boundaries:
+
+- Password fields are never sent through MCP tools, chat messages, model-context
+  updates, widget state, console logs, or server request logs.
+- Safe device details and completion status can reach the model. A per-session
+  authorization value and loopback endpoint are delivered as widget-only `_meta`.
+- The listener binds only to 127.0.0.1. Each session expires after ten minutes,
+  checks an unguessable authorization header and exact Host/Origin, and becomes
+  unusable after a successful save. No GET/browser enrollment page is served.
+- The UI resource permits connections only to that helper's exact loopback
+  origin and loads no remote assets. Cross-origin submissions are restricted to
+  the documented default ChatGPT sandbox origin. Other host origins fail closed.
+- Local-network/browser sandbox permission may be required. If the host cannot
+  render MCP Apps or cannot reach loopback, show an error; never silently open a
+  browser, request a password in chat, or route it through tool arguments.
+- The helper uses local HTTP for the loopback channel. FMC HTTPS validation
+  remains enabled. Native store/host/network observability still follows your
+  OS and workspace controls; this does not claim protection from local malware.
+
+Verified protocol support and JavaScript component tests do not establish that every
+ChatGPT/Codex rollout permits inline UI to reach a local listener. Test the card
+in a fresh local chat after updating the plugin. The terminal alternative below
+remains available only when deliberately chosen by the user.
 
 ## Terminal alternative
 
