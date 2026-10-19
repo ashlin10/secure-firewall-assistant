@@ -19,6 +19,18 @@ The GitHub connection must authenticate with an account authorized for ashlin10;
 an authenticated enterprise-managed account is not necessarily that account.
 Browser sign-in does not automatically configure command-line Git authentication.
 
+If GitHub requires a different SSH key from Cisco, select it in this clone's
+private Git configuration (use your own key path):
+
+```sh
+git config --local secureFirewall.githubIdentityFile ~/.ssh/id_ed25519_ashlin10
+```
+
+The helper applies that identity only to GitHub pushes. This setting and the key
+stay outside tracked source and release packages. Unlock an encrypted key through
+your local SSH agent; on macOS the helper also supports an existing Keychain
+passphrase. Without this setting, normal SSH configuration applies.
+
 After reviewing and committing a change, run:
 
 ```sh

@@ -1,7 +1,9 @@
 """Push reviewed main (and an optional existing version tag) to both private destinations."""
 import argparse
 import re
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,10 +34,24 @@ def main():
     for remote, expected in REMOTES.items():
         if git("remote", "get-url", "--push", remote, capture=True) != expected:
             raise SystemExit(f"Remote {remote} differs from the documented destination; no pushes attempted.")
+    identity = git("config", "--default", "", "--get",
+                   "secureFirewall.githubIdentityFile", capture=True)
+    github_options = []
+    if identity:
+        identity_path = Path(identity).expanduser().resolve()
+        if not identity_path.is_file():
+            raise SystemExit("Configured GitHub SSH identity file does not exist; no pushes attempted.")
+        ssh = ["ssh", "-F", "/dev/null" if sys.platform != "win32" else "NUL",
+               "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes",
+               "-o", "StrictHostKeyChecking=yes", "-i", str(identity_path)]
+        if sys.platform == "darwin":
+            ssh += ["-o", "UseKeychain=yes"]
+        github_options = ["-c", "core.sshCommand=" + shlex.join(ssh)]
     for remote in REMOTES:
-        git("push", remote, "main")
+        options = github_options if remote == "github" else []
+        git(*options, "push", remote, "main")
         if args.release_tag:
-            git("push", remote, "refs/tags/" + args.release_tag)
+            git(*options, "push", remote, "refs/tags/" + args.release_tag)
         print(f"Updated {remote}.")
 
 
