@@ -8,7 +8,10 @@ The user's original file was not modified.
 
 `data/provenance.json` records the exact source/sanitized hashes and transformations.
 The compressed runtime document removes all examples and code samples and replaces
-non-public-documentation sample URLs. Its request/response constraints remain.
+non-public-documentation sample URLs. Its request/response constraints remain, with maintained corrections applied by
+`scripts/schema_corrections.py`. The VPN endpoint POST now declares `bulk` and
+object/array bodies, based on project-owner confirmation on 21 October 2026.
+This corrects an omission in the supplied schema; it is not a live-device test.
 The importer reads JSON only; no attached commands or descriptions are executed.
 
 Known unresolved reference:
@@ -48,7 +51,7 @@ point a user installation at an unreviewed arbitrary downloaded schema.
 ## Efficient multi-item execution
 
 Discovery and description expose `execution_options` for every REST method. The
-current schema declares a `bulk` query parameter on 54 POST, 19 PUT, and 41 DELETE
+current schema declares a `bulk` query parameter on 55 POST, 19 PUT, and 41 DELETE
 operations. `bulk_only=true` filters discovery across these methods. Array body
 support is separately resolved from local schema references; a bulk parameter
 alone does not prove an array body is supported. No unlisted bulk flag is added.

@@ -1,6 +1,6 @@
 {
   "name": "secure-firewall-assistant",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Configure and validate enrolled Cisco Secure Firewall lab devices through local REST and optional SSH tools.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

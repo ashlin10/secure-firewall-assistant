@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.9
+
+- Correct the VPN endpoint create schema to declare `bulk=true` and array bodies; preserve the correction during schema imports.
+
 ## 0.3.8
 
 - Expose execution options for all REST methods, including bulk, array bodies, filtering, pagination, media types, and async responses; add bulk-only discovery.

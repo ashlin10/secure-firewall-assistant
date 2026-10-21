@@ -95,7 +95,7 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
     send('tools/call',{name:'save_device_inventory',arguments:{devices,deleted_devices}},11);
     timer=setTimeout(()=>{busy(false);status('Save status is unknown. Reopen inventory to check saved values before retrying.','error')},20000);
   });
-  send('ui/initialize',{appInfo:{name:'Device inventory',version:'0.3.8'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
+  send('ui/initialize',{appInfo:{name:'Device inventory',version:'0.3.9'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
   const initial=window.openai?.toolResponseMetadata;
   if(initial)accept(initial.call_tool_result||initial.mcp_tool_result||initial);
 })();

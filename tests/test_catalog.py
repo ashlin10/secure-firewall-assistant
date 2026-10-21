@@ -80,14 +80,30 @@ def test_errors_never_contain_rejected_payload_values(catalog):
     assert sentinel not in json.dumps(error.value.result())
 
 
-def test_execution_options_cover_all_methods_and_do_not_invent_endpoint_bulk(catalog):
+def test_execution_options_cover_all_methods_and_corrected_endpoint_bulk(catalog):
     counts = {}
     for method in ("post", "put", "delete"):
         page = catalog.search(method=method, bulk_only=True)
         counts[method] = page["total"]
         assert all(o["execution_options"]["bulk_parameter"] for o in page["operations"])
-    assert counts == {"post": 54, "put": 19, "delete": 41}
+    assert counts == {"post": 55, "put": 19, "delete": 41}
     assert catalog.options("createMultipleNetworkObject")["bulk_create_supported"] is True
-    assert catalog.describe("createVpnEndpoint")["execution_options"]["bulk_create_supported"] is False
+    assert catalog.describe("createVpnEndpoint")["execution_options"]["bulk_create_supported"] is True
     assert catalog.options("getAllNetworkObject")["pagination"] == {
         "supported": True, "expanded": True, "filter": True}
+
+
+def test_vpn_endpoint_bulk_validation(catalog):
+    path = {"containerUUID": "topology-1"}
+    endpoint = {"type": "VpnEndpoint"}
+    catalog.prepare("createVpnEndpoint", path, {}, {}, endpoint, "domain-1")
+    result = catalog.prepare("createVpnEndpoint", path, {"bulk": True}, {}, [endpoint, endpoint], "domain-1")
+    assert result["query"] == {"bulk": True}
+    for body, query, code in [([endpoint], {}, "bulk_flag_required"),
+                              (endpoint, {"bulk": True}, "bulk_array_required"),
+                              ([42], {"bulk": True}, "request_validation_failed")]:
+        with pytest.raises(AssistantError) as error:
+            catalog.prepare("createVpnEndpoint", path, query, {}, body, "domain-1")
+        assert error.value.code == code
+    assert any(op["id"] == "createVpnEndpoint" for op in
+               catalog.search("endpoints", "post", bulk_only=True)["operations"])

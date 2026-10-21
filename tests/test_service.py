@@ -183,6 +183,9 @@ def test_batch_collection_mismatch_cannot_pass(assistant, lab):
 
 def test_batch_nonbulk_concurrency_is_bounded_and_real(assistant, lab):
     import threading
+    # Simulate a catalog operation that genuinely lacks native bulk support.
+    op = assistant.catalog.get("createVpnEndpoint")
+    op["parameters"] = [p for p in op["parameters"] if p.get("name") != "bulk"]
     active = 0
     maximum = 0
     lock = threading.Lock()
@@ -222,3 +225,23 @@ def test_batch_async_is_pending_not_verified(assistant, lab):
     result = assistant.execute_batch("lab-fmc-1", "createMultipleNetworkObject", "Create network", [NETWORK])
     assert result["result"]["counts"] == {"pending_async": 1}
     assert result["verification"]["status"] != "verified_in_fmc"
+
+
+def test_vpn_endpoint_batch_uses_native_bulk(assistant, lab):
+    def endpoints(request):
+        if request.url.path.endswith("endpoints"):
+            if request.method == "POST":
+                assert request.url.params["bulk"] == "true"
+                bodies = json.loads(request.content)
+                assert isinstance(bodies, list) and len(bodies) == 2
+                for i, body in enumerate(bodies):
+                    lab.objects[str(i)] = {**body, "id": str(i)}
+                return httpx.Response(201, json={"items": list(lab.objects.values())})
+            return httpx.Response(200, json={"items": list(lab.objects.values()), "paging": {"pages": 1}})
+    lab.override = endpoints
+    bodies = [{"peerType": "SPOKE", "extranet": True,
+               "extranetInfo": {"name": f"spoke-{i}", "ipAddress": f"198.18.0.{i+1}"}} for i in range(2)]
+    result = assistant.execute_batch("lab-fmc-1", "createVpnEndpoint", "Create independent spokes", bodies,
+                                     path={"containerUUID": "vpn-1"})
+    assert result["result"]["counts"] == {"verified_in_fmc": 2}
+    assert len([r for r in lab.calls if r.method == "POST" and r.url.path.endswith("endpoints")]) == 1

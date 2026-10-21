@@ -6,6 +6,8 @@ import json
 import re
 from pathlib import Path
 
+from schema_corrections import CORRECTION_NOTE, apply_corrections
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "src/secure_firewall_assistant/data"
 
@@ -79,6 +81,7 @@ def main():
     raw = args.source.read_bytes()
     doc = json.loads(raw)
     cleaned = sanitize(doc, example_credentials(doc))
+    apply_corrections(cleaned)
     encoded = json.dumps(cleaned, separators=(",", ":"), sort_keys=True).encode()
     DATA.mkdir(parents=True, exist_ok=True)
     (DATA / "fmc.openapi.json.gz").write_bytes(gzip.compress(encoded, mtime=0))
@@ -93,7 +96,7 @@ def main():
         "paths": len(doc["paths"]), "operations": len(operations),
         "schemas": len(doc["components"]["schemas"]),
         "unresolved_references": unresolved_refs(cleaned),
-        "transformations": ["Removed all example/examples and code sample fields",
+        "transformations": [CORRECTION_NOTE, "Removed all example/examples and code sample fields",
                             "Removed non-structural sample credential values repeated elsewhere in the document",
                             "Replaced non-public-documentation example URLs",
                             "No missing definitions fabricated; affected response validation reports a warning"],
