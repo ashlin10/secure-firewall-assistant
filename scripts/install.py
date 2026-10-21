@@ -13,7 +13,7 @@ from pathlib import Path
 
 NAME = "secure-firewall-assistant"
 EXCLUDED = {".git", ".venv", ".pytest_cache", ".ruff_cache", "__pycache__", "dist", "build", ".github", "tests",
-            "devices.yaml", "devices.yaml.lock", ".sfa-devices-*.tmp"}
+            "devices.yaml", "devices.yaml.lock", ".sfa-devices-*.tmp", ".sfa-devices-*.backup"}
 
 
 def write_json(path, value):

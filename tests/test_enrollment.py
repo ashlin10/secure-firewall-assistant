@@ -19,19 +19,20 @@ def row(name='new-device', host='2001:db8::1', https=12202, ssh=2222):
 
 def test_inventory_only_save_and_readback_preserves_credentials(assistant, lab):
     ui = EnrollmentUI(assistant.state, assistant.secrets)
-    before = assistant.secrets._read()
     config_before = assistant.state.inventory_path.read_bytes()
     ui.save([row(), row('lab-fmc-1', 'fmc.example.invalid')])
     saved = yaml.safe_load(assistant.state.device_file.read_text())
-    assert saved['credentials'] == before['credentials']
-    assert saved['devices']['new-device'] == row()
+    assert 'credentials' not in saved
+    assert saved['devices']['lab-fmc-1']['password'] == 'SYNTHETIC-LOGIN-SENTINEL'
+    assert saved['devices']['new-device'] == {**row(), 'username':'', 'password':''}
     assert assistant.state.inventory_path.read_bytes() == config_before
     assert assistant.state.inventory()['devices']['new-device']['address'] == 'https://[2001:db8::1]:12202'
-    assert ui.rows() == [row('lab-fmc-1', 'fmc.example.invalid'), row()]
+    assert [r['device_name'] for r in ui.rows()] == ['lab-fmc-1', 'new-device']
+    assert 'SYNTHETIC-LOGIN' not in json.dumps(ui.start().model_dump())
     assert lab.calls == []
     ui.save([row(https=443)])
     assert len(ui.rows()) == 2
-    assert assistant.secrets._read()['credentials'] == before['credentials']
+    assert assistant.secrets.get('lab-fmc-1-auth') == 'SYNTHETIC-LOGIN-SENTINEL'
     with pytest.raises(AssistantError, match='local account'):
         assistant.state.device('new-device')
 
@@ -39,7 +40,7 @@ def test_inventory_only_save_and_readback_preserves_credentials(assistant, lab):
 @pytest.mark.parametrize('devices', [
     [row(https=0)], [row(ssh=65536)], [row(https=True)], [row(ssh=22.5)],
     [row(host='https://example.invalid')], [row(host='host:443')], [row(host='bad host')],
-    [row(name='../escape')], [row(), row()], [row(), row(host='bad/host')], [],
+    [row(name='../escape')], [row(), row()], [row(), row(host='bad/host')],
     [{**row(), 'password': 'forbidden'}],
 ])
 def test_invalid_inventory_never_writes(assistant, devices):
@@ -70,12 +71,16 @@ def test_mcp_inventory_roundtrip_without_device_connections(assistant, lab):
             assert resource['mimeType'] == MIME
             assert resource['_meta']['ui']['csp']['connectDomains'] == []
             html = resource['text']
-            for absent in ('Check local connection', 'type="password"', 'fetch(', 'connect_fmc', '/probe', 'Username'):
+            for absent in ('Check local connection', 'type="password"', 'fetch(', 'connect_fmc', '/probe'):
                 assert absent not in html
+            assert "['password','Password','password','']" in html
+            assert 'Delete device' in html
+            saver = next(t for t in tools if t.name == 'save_device_inventory')
+            assert saver.meta['ui']['visibility'] == ['app']
             result = await client.call_tool('start_enrollment', {'alias':'fixture','address':'https://example.invalid:8443'})
             public = json.loads(result.content[0].text)
             assert public['status'] == 'edit_device_inventory'
-            assert public['devices'][-1] == row('fixture', 'example.invalid', 8443, 22)
+            assert public['devices'][-1] == {**row('fixture', 'example.invalid', 8443, 22), 'username':'', 'has_account':False}
             result = await client.call_tool('save_device_inventory', {'devices':[row()]})
             assert 'inventory_saved' in result.content[0].text
             assert lab.calls == []
@@ -89,3 +94,64 @@ def test_card_bridge_flow():
     root = Path(__file__).resolve().parents[1]
     subprocess.run([node, str(root / 'tests/card_flow.mjs'),
                     str(root / 'src/secure_firewall_assistant/enrollment_card.html')], check=True)
+
+
+def test_password_save_preserve_rotate_and_response_privacy(assistant, lab):
+    ui = EnrollmentUI(assistant.state, assistant.secrets)
+    account = {**row(), 'username': 'fixture-user', 'password': '  SYNTHETIC-INLINE  '}
+    result = ui.save([account])
+    assert assistant.state.device('new-device').username == 'fixture-user'
+    assert assistant.secrets.get('new-device-auth') == account['password']
+    assert 'SYNTHETIC' not in json.dumps(result)
+    assert 'password' not in ui.rows()[-1]
+    ui.save([{**account, 'password': ''}])
+    assert assistant.secrets.get('new-device-auth') == account['password']
+    ui.save([{**account, 'password': 'SYNTHETIC-ROTATED'}])
+    assert assistant.secrets.get('new-device-auth') == 'SYNTHETIC-ROTATED'
+    assert lab.calls == []
+
+
+def test_delete_removes_legacy_account_and_supports_empty_inventory(assistant, lab):
+    ui = EnrollmentUI(assistant.state, assistant.secrets)
+    ui.save([row()])
+    ui.save([], ['lab-fmc-1', 'new-device'])
+    assert ui.rows() == []
+    assert assistant.state.aliases() == []
+    saved = assistant.secrets._read()
+    assert saved['devices'] == {}
+    assert 'SYNTHETIC-LOGIN' not in json.dumps(saved)
+    assert json.loads(assistant.state.inventory_path.read_text())['devices'] == {}
+    assert lab.calls == []
+
+
+def test_legacy_credentials_migrate_without_losing_api_secrets(assistant):
+    store = assistant.secrets
+    store.path.write_text(yaml.safe_dump({'format_version':1, 'devices':{},
+        'credentials':{'lab-fmc-1-auth':'SYNTHETIC-LEGACY', 'radius-ref':'SYNTHETIC-RADIUS'}}))
+    ui = EnrollmentUI(assistant.state, store)
+    ui.save([row('lab-fmc-1', 'fmc.example.invalid')])
+    saved = store._read()
+    assert 'credentials' not in saved
+    assert saved['devices']['lab-fmc-1']['password'] == 'SYNTHETIC-LEGACY'
+    assert store.get('radius-ref') == 'SYNTHETIC-RADIUS'
+    assert store.get('lab-fmc-1-auth') == 'SYNTHETIC-LEGACY'
+    assert 'SYNTHETIC' not in json.dumps(ui.start().model_dump())
+
+
+@pytest.mark.parametrize('deleted', [['../bad'], 'lab-fmc-1', ['new-device']])
+def test_invalid_deletions_never_write(assistant, deleted):
+    before = assistant.state.device_file.read_bytes()
+    with pytest.raises(AssistantError):
+        EnrollmentUI(assistant.state, assistant.secrets).save([row()], deleted)
+    assert assistant.state.device_file.read_bytes() == before
+
+
+def test_failed_yaml_delete_restores_legacy_inventory(assistant, monkeypatch):
+    before = assistant.state.inventory_path.read_bytes()
+    def fail(_):
+        raise OSError('synthetic write failure')
+    monkeypatch.setattr(assistant.secrets, '_write', fail)
+    with pytest.raises(OSError):
+        EnrollmentUI(assistant.state, assistant.secrets).save([], ['lab-fmc-1'])
+    assert assistant.state.inventory_path.read_bytes() == before
+    assert assistant.state.device('lab-fmc-1').username == 'fixture-user'

@@ -3,40 +3,48 @@
 ## Edit inside ChatGPT or Codex
 
 Ask “Open device inventory” or use the plugin app entrypoint. The embedded form
-lists existing devices and lets you add rows. Each device has exactly four fields:
+lists existing devices and lets you add rows. Each device has six fields:
 
 - Device Name
 - Hostname/IP Address (without a scheme, path, or port)
 - HTTPS port (default 443)
 - SSH port (default 22)
+- Username
+- Password (masked during entry)
 
-Select **Save inventory** to update the local `devices.yaml`. Ports must be whole
-numbers from 1 through 65535; device names must be unique. Existing names update
-that device; a new name adds a device. Devices omitted from an update remain in
-the file. Renaming a row adds a new name and does not delete the old entry.
+Select **Save inventory** to update local `devices.yaml`. Username and password
+are stored in clear text under each device. A blank password preserves the saved
+password; existing passwords are never sent back to the app or model. A password
+requires a username. Leaving both blank supports inventory-only devices.
 
-The form never requests a username or password and has no local connection check.
-Saving does not authenticate, contact any device, deploy, change stored credentials,
-or write the legacy inventory JSON. Existing account, domain, CA, and other device
-settings are preserved. New entries store only the four inventory fields; local
-account configuration is required before connecting to them.
+Use the trash icon next to a device to remove its row, then save to delete it.
+Deletion also removes its legacy inventory entry and associated login reference.
+All devices can be deleted. Renaming a row adds a new alias and preserves the
+original; use its trash icon to delete the original explicitly. Advanced settings
+belong to the original alias. Omitted devices are preserved unless
+explicitly named for deletion. Ports must be integers from 1 through 65535 and
+device names must be unique. Saving does not contact devices or deploy.
 
-The app uses the host MCP tool bridge, with no local HTTP listener or remote
-assets. `device_inventory` opens it; `start_enrollment` remains a compatibility
-entrypoint and prefills a supplied name/address. `save_device_inventory` validates
-all rows before a locked, atomic YAML update. Save errors leave the form editable.
-If the response times out, reopen the inventory to inspect saved values before
-retrying. If the host cannot render MCP Apps, refresh the plugin and restart the
-host; the assistant must not claim the card was displayed or a save completed.
+The app uses the host MCP tool bridge, with no local listener or remote assets.
+`device_inventory` opens it; `start_enrollment` prefills a supplied name/address.
+The app-only `save_device_inventory` tool validates all rows and deletion names
+before writing. Save errors leave the form editable. After a timeout, reopen the
+inventory to inspect saved values before retrying. Refresh the plugin and restart
+the host if it cannot render MCP Apps.
 
-The inventory file is ignored by Git, excluded from release archives, and written
-with owner-only permissions on Unix. Existing credentials in the same file remain
-private and are never returned to the form or model.
+Legacy top-level `credentials` entries migrate into the matching device's
+`password` field on save. API-only references remain in `secrets`, with no separate
+login credentials section. Migration saves a private
+`.sfa-devices-pre-inline.backup` beside the YAML before replacing the old format.
+Restore that backup before rolling back to a release without inline passwords.
+The inventory and migration backup are excluded from Git and release archives;
+Unix writes use owner-only permissions. The password field uses the host's MCP
+bridge; it is app-visible only, and responses contain no saved passwords.
 
 ## Terminal alternative
 
 The terminal option separately configures accounts and advanced device settings.
-It writes credentials to the same local YAML file; the inventory form does not.
+It writes the password under the device in the same local YAML file.
 
 macOS:
 
@@ -104,10 +112,10 @@ mode `0600`; on Windows, permissions inherit the plugin folder's ACLs, so keep
 that folder restricted to your user. Inventory and evidence remain in the
 per-user app data directories. `SFA_DATA_DIR` is an optional local path override
 for isolated tests/approved deployments; it is never provided as an MCP argument.
-New inventory entries contain `device_name`, `hostname`, `https_port`, and
-`ssh_port`. Existing runtime device metadata remains compatible and is preserved
-when updating inventory details. Credentials are configured separately through
-local hidden terminal entry; they are never collected by the inventory form.
+New inventory entries contain `device_name`, `hostname`, `https_port`,
+`ssh_port`, `username`, and `password`. Existing runtime metadata is preserved
+when editing the same device name. Credentials can be entered through the
+inventory app or local hidden terminal entry.
 
 Browser sign-in is separate. The plugin never reads a stored password into chat
 or types it through a model-visible browser tool. Reuse an approved browser

@@ -1,4 +1,4 @@
-"""Device inventory MCP App. Uses the host bridge; no network listener or credentials."""
+"""Device inventory MCP App. Uses the host bridge; no network listener."""
 import ipaddress
 import json
 import re
@@ -9,13 +9,14 @@ from filelock import FileLock
 from mcp.types import CallToolResult, TextContent
 
 from .errors import AssistantError
-from .state import ALIAS
+from .state import ALIAS, atomic_json
 
 MIME = "text/html;profile=mcp-app"
 
 
 def validate_row(row):
-    if not isinstance(row, dict) or set(row) != {"device_name", "hostname", "https_port", "ssh_port"}:
+    required = {"device_name", "hostname", "https_port", "ssh_port"}
+    if not isinstance(row, dict) or not required <= set(row) or set(row) - required - {"username", "password"}:
         raise AssistantError("invalid_inventory", "Each device requires Device Name, Hostname/IP Address, HTTPS port, and SSH port.")
     name, host = row["device_name"], row["hostname"]
     if not isinstance(name, str) or not ALIAS.fullmatch(name):
@@ -30,6 +31,11 @@ def validate_row(row):
             raise AssistantError("invalid_inventory", "Enter a valid hostname or IP address without a URL scheme, path, or port.") from None
     if any(type(row[key]) is not int or not 1 <= row[key] <= 65535 for key in ("https_port", "ssh_port")):
         raise AssistantError("invalid_inventory", "HTTPS and SSH ports must be whole numbers from 1 to 65535.")
+    for key in ("username", "password"):
+        if key in row and (not isinstance(row[key], str) or len(row[key]) > 4096):
+            raise AssistantError("invalid_inventory", "Username and password must be text of at most 4096 characters.")
+    if row.get("password") and not row.get("username"):
+        raise AssistantError("invalid_inventory", "Enter a username when setting a password.")
     return dict(row)
 
 
@@ -46,7 +52,7 @@ class EnrollmentUI:
     @property
     def resource_meta(self):
         return {"ui": {"prefersBorder": True, "csp": {"connectDomains": [], "resourceDomains": []}},
-                "openai/widgetDescription": "Edit device names, hostnames/IP addresses, HTTPS ports, and SSH ports in the local device inventory YAML.",
+                "openai/widgetDescription": "Edit device details, usernames, and passwords, or delete devices from the local inventory YAML.",
                 "openai/widgetCSP": {"connect_domains": [], "resource_domains": []}}
 
     def rows(self):
@@ -55,7 +61,8 @@ class EnrollmentUI:
             origin = urlsplit(device["address"]) if device["kind"] == "fmc" else None
             rows.append({"device_name": name, "hostname": origin.hostname if origin else device["address"],
                          "https_port": (origin.port or 443) if origin else 443,
-                         "ssh_port": device.get("port", 22)})
+                         "ssh_port": device.get("port", 22), "username": device.get("username", ""),
+                         "has_account": self._has_account(name, device)})
         # Preserve HTTPS metadata on FTD entries too.
         local = self.store._read()["devices"]
         for row in rows:
@@ -63,38 +70,75 @@ class EnrollmentUI:
             row["https_port"] = stored.get("https_port", row["https_port"])
         return rows
 
+    def _has_account(self, name, device):
+        stored = self.store._read()
+        reference = device.get("credential_ref", name + "-auth")
+        return bool(stored["devices"].get(name, {}).get("password") or
+                    stored.get("credentials", {}).get(reference) or stored.get("secrets", {}).get(reference))
+
     def start(self, alias="", address=""):
         rows = self.rows()
         if alias and not any(row["device_name"] == alias for row in rows):
             origin = urlsplit(address) if "://" in address else None
             rows.append({"device_name": alias, "hostname": (origin.hostname or "") if origin else address,
-                         "https_port": (origin.port or 443) if origin else 443, "ssh_port": 22})
+                         "https_port": (origin.port or 443) if origin else 443, "ssh_port": 22,
+                         "username": "", "has_account": False})
         public = {"status": "edit_device_inventory", "devices": rows,
                   "next_step": "Edit the device inventory form and select Save inventory. This only updates devices.yaml."}
         return CallToolResult(content=[TextContent(type="text", text=json.dumps(public))], structured_content=public)
 
-    def save(self, devices):
-        if not isinstance(devices, list) or not 1 <= len(devices) <= 1000:
-            raise AssistantError("invalid_inventory", "Submit between 1 and 1000 devices.")
+    def save(self, devices, deleted_devices=None):
+        if not isinstance(devices, list) or not 0 <= len(devices) <= 1000:
+            raise AssistantError("invalid_inventory", "Submit up to 1000 devices.")
         rows = [validate_row(row) for row in devices]
         if len({row["device_name"] for row in rows}) != len(rows):
             raise AssistantError("invalid_inventory", "Device names must be unique.")
+        deleted_devices = [] if deleted_devices is None else deleted_devices
+        if (not isinstance(deleted_devices, list) or len(deleted_devices) > 1000 or
+                any(not isinstance(name, str) or not ALIAS.fullmatch(name) for name in deleted_devices) or
+                set(deleted_devices) & {row["device_name"] for row in rows}):
+            raise AssistantError("invalid_inventory", "Deleted devices must be valid names absent from the saved rows.")
         # Validate every row before writing, and share the credential writer's lock.
-        with FileLock(str(self.store.path) + ".lock", timeout=15):
+        with FileLock(str(self.store.path) + ".lock", timeout=15), \
+                FileLock(str(self.state.config / "inventory.lock"), timeout=15):
             stored = self.store._read()
             existing = self.state.inventory()["devices"]
+            # Bring legacy metadata into YAML before migrating its credential references.
+            for name, device in existing.items():
+                stored["devices"].setdefault(name, device.copy())
+            for name in deleted_devices:
+                record = stored["devices"].pop(name, {})
+                reference = record.get("credential_ref", name + "-auth")
+                if not any(device.get("credential_ref", alias + "-auth") == reference
+                           for alias, device in stored["devices"].items()):
+                    for section in ("credentials", "secrets"):
+                        stored.get(section, {}).pop(reference, None)
             for row in rows:
                 name = row["device_name"]
                 record = stored["devices"].get(name, existing.get(name, {})).copy()
-                record.update(row)
+                update = dict(row)
+                if not update.get("password"):
+                    update.pop("password", None)
+                record.update(update)
                 if "address" in record:
                     host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]
                     record["address"] = (f'https://{host}:{row["https_port"]}'
                                          if record.get("kind") == "fmc" else row["hostname"])
                     record["port"] = row["ssh_port"]
                 stored["devices"][name] = record
-            self.store._write(stored)
-        return {"ok": True, "status": "inventory_saved", "devices": rows,
+            legacy_before = None
+            if deleted_devices and self.state.inventory_path.exists():
+                legacy_before = json.loads(self.state.inventory_path.read_text(encoding="utf-8"))
+                legacy = {**legacy_before, "devices": {name: device for name, device in legacy_before["devices"].items()
+                                                     if name not in deleted_devices}}
+                atomic_json(self.state.inventory_path, legacy)
+            try:
+                self.store._write(stored)
+            except Exception:
+                if legacy_before is not None:
+                    atomic_json(self.state.inventory_path, legacy_before)
+                raise
+        return {"ok": True, "status": "inventory_saved", "devices": self.rows(),
                 "message": "Device inventory saved to devices.yaml."}
 
     def html(self):

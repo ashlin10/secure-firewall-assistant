@@ -68,8 +68,9 @@ To select a previous successfully installed release:
 
 On Windows use `./Install.ps1 -Rollback PREVIOUS_RELEASE_DIRECTORY_NAME`.
 Then refresh the plugin in ChatGPT. Do not delete old releases until no task is
-using them. Inventory format v1 has no migration; an unknown future format is
-rejected rather than overwritten. Future migrations must back up and test state.
+using them. Version 0.3.6 migrates legacy credentials into per-device passwords on save.
+Restore the private pre-migration YAML backup before rolling back to an older
+release. Unknown future formats are rejected rather than overwritten.
 
 ## Failure and removal
 

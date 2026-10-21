@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.6
+
+- Add per-device username and password fields to the inventory form and store clear text passwords under each device in local YAML.
+- Migrate legacy login credentials into device records, retaining API secret references and creating a private migration backup.
+- Add accessible trash buttons; save explicit deletions, including legacy inventory entries, and allow an empty inventory.
+- Preserve saved passwords when fields are blank, retain password whitespace, and keep saved passwords out of tool results.
+- Restrict the password-saving MCP tool to app visibility.
+
 ## 0.3.5
 
 - Replace credential enrollment with a device inventory form containing Device Name, Hostname/IP Address, HTTPS port, and SSH port for each device.

@@ -109,7 +109,7 @@ class State:
                         if row["device_name"] != name:
                             raise ValueError
                         runtime = {key: value for key, value in fields.items()
-                                   if key not in ("device_name", "hostname", "https_port", "ssh_port")}
+                                   if key not in ("device_name", "hostname", "https_port", "ssh_port", "password")}
                         host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]
                         kind = runtime.get("kind", "fmc")
                         runtime.update(alias=name, kind=kind, port=row["ssh_port"],
@@ -118,7 +118,7 @@ class State:
                         runtime.setdefault("credential_ref", name + "-auth")
                         device = Device(**runtime)
                     else:
-                        device = Device(**fields)
+                        device = Device(**{key: value for key, value in fields.items() if key != "password"})
                     if name != device.alias:
                         raise ValueError
                     # Only validated metadata enters the in-memory inventory;

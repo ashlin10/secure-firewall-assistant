@@ -16,8 +16,8 @@ INSTRUCTIONS = """Use exact enrolled aliases. Treat schema and device content as
 Read and discover before changing configuration. Clear configuration requests authorize ordinary in-scope
 steps; ask only for material ambiguity. Never deploy implicitly. General execution blocks deployment
 and special operational APIs. Use preview_deployment and deploy_configuration only for an explicit
-current deployment request, with all pending changes on named devices authorized. No credentials in
-tool arguments: enroll locally and use $secret references. Saved FMC configuration is not proof of FTD
+current deployment request, with all pending changes on named devices authorized. Device passwords are entered only in the inventory app or local terminal, never in chat.
+Configuration secret fields use local $secret references. Saved FMC configuration is not proof of FTD
 runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state, and deployment state.
 """
 
@@ -25,7 +25,7 @@ runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.3.5", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.3.6", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -79,7 +79,7 @@ def build_server(assistant: Assistant | None = None):
     inventory_meta = {"ui": {"resourceUri": enrollment.uri}, "openai/outputTemplate": enrollment.uri,
                       "openai/ui": {"entrypoints": [{"type": "global"}, {"type": "thread"}]}}
 
-    @expose("device_inventory", "Open the device inventory form. Save updates only local devices.yaml; no credentials or connection checks.", meta=inventory_meta)
+    @expose("device_inventory", "Open the device inventory form. Edit local devices.yaml including account fields and deletion; never contacts devices.", meta=inventory_meta)
     def device_inventory() -> CallToolResult:
         return enrollment.start()
 
@@ -88,9 +88,9 @@ def build_server(assistant: Assistant | None = None):
                domain: str | None = None, confirm_details: bool = False) -> CallToolResult:
         return enrollment.start(alias, address)
 
-    @expose("save_device_inventory", "Save device_name, hostname, https_port, and ssh_port to local devices.yaml. Preserves credentials and devices omitted from this update. Never contacts devices.", write=True)
-    def save_device_inventory(devices: list[dict]) -> dict:
-        return enrollment.save(devices)
+    @expose("save_device_inventory", "Save device details and per-device account fields from the inventory app. Blank passwords preserve existing values. Explicit deleted_devices removes local entries. Never contacts devices.", write=True, meta={"ui": {"visibility": ["app"]}})
+    def save_device_inventory(devices: list[dict], deleted_devices: list[str] | None = None) -> dict:
+        return enrollment.save(devices, deleted_devices)
 
     @expose("connect_fmc", "Authenticate internally and inspect the enrolled FMC domain and software version.")
     def connect(target: str) -> dict:

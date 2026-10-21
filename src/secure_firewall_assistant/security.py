@@ -58,7 +58,7 @@ class SecretStore:
 
     def _read(self) -> dict:
         if not self.path.exists():
-            return {"format_version": 1, "devices": {}, "credentials": {}}
+            return {"format_version": 1, "devices": {}}
         try:
             value = yaml.safe_load(self.path.read_text(encoding="utf-8"))
             if (not isinstance(value, dict) or value.get("format_version") != 1 or
@@ -68,12 +68,35 @@ class SecretStore:
                         for k, v in value.get("credentials", {}).items())):
                 raise ValueError
             value.setdefault("devices", {})
-            value.setdefault("credentials", {})
+            if (not isinstance(value.get("secrets", {}), dict) or
+                    any(not isinstance(k, str) or not isinstance(v, str)
+                        for k, v in value.get("secrets", {}).items())):
+                raise ValueError
             return value
         except (OSError, UnicodeError, yaml.YAMLError, ValueError, TypeError):
             raise AssistantError("credential_file_invalid", "The local devices.yaml file is invalid; repair it from the sample file.") from None
 
     def _write(self, value: dict):
+        # Migrate legacy login references into each device; retain API-only secrets.
+        if value.get("credentials") and self.path.exists():
+            backup = self.path.with_name(".sfa-devices-pre-inline.backup")
+            if not backup.exists():
+                fd = os.open(backup, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "wb") as out:
+                    out.write(self.path.read_bytes())
+        legacy = {**value.pop("credentials", {}), **value.pop("secrets", {})}
+        consumed = set()
+        for name, record in value["devices"].items():
+            reference = record.get("credential_ref", name + "-auth")
+            if reference in legacy:
+                if not record.get("password"):
+                    record["password"] = legacy[reference]
+                consumed.add(reference)
+            record.setdefault("username", "")
+            record.setdefault("password", "")
+        remaining = {key: item for key, item in legacy.items() if key not in consumed}
+        if remaining:
+            value["secrets"] = remaining
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".sfa-devices-", suffix=".tmp")
         try:
@@ -94,7 +117,10 @@ class SecretStore:
         self._check(reference)
         try:
             with FileLock(str(self.path) + ".lock", timeout=15):
-                value = self._read()["credentials"].get(reference)
+                stored = self._read()
+                value = next((record.get("password") for name, record in stored["devices"].items()
+                              if record.get("credential_ref", name + "-auth") == reference), None)
+                value = value or stored.get("secrets", {}).get(reference) or stored.get("credentials", {}).get(reference)
         except AssistantError:
             raise
         except Exception:
@@ -112,9 +138,23 @@ class SecretStore:
         try:
             with FileLock(str(self.path) + ".lock", timeout=15):
                 stored = self._read()
-                stored["credentials"][reference] = value
                 if device is not None:
-                    stored["devices"][device.alias] = asdict(device)
+                    from urllib.parse import urlsplit
+                    origin = urlsplit(device.address) if device.kind == "fmc" else None
+                    record = stored["devices"].get(device.alias, {}).copy()
+                    record.update(asdict(device))
+                    record.update(device_name=device.alias, hostname=origin.hostname if origin else device.address,
+                                  https_port=(origin.port or 443) if origin else record.get("https_port", 443),
+                                  ssh_port=device.port, password=value)
+                    stored["devices"][device.alias] = record
+                else:
+                    matches = [record for name, record in stored["devices"].items()
+                               if record.get("credential_ref", name + "-auth") == reference]
+                    if matches:
+                        for record in matches:
+                            record["password"] = value
+                    else:
+                        stored.setdefault("secrets", {})[reference] = value
                 self._write(stored)
         except Exception:
             raise AssistantError("credential_file_write_failed", "The local devices.yaml file could not be saved.") from None

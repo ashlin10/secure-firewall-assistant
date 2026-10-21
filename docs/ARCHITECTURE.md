@@ -112,3 +112,14 @@ No browser automation or automatic browser password injection is included here.
 SSH diagnostics have a small read-only allowlist, verified host keys, bounded
 output, and recognized prompts. No expert mode, configuration, or privilege
 escalation. These prompt/command assumptions require live FTD validation.
+
+
+## Inventory app accounts and deletion (0.3.6)
+
+The inventory MCP App collects username and password per device. Passwords travel
+through the host bridge to the app-only save tool, then are stored in clear text
+under the device in owner-readable local YAML. They are not returned to the app
+or model. API configuration secrets continue to use local references. A blank
+password preserves the existing value. The trash button queues an explicit local
+device deletion until Save inventory; deletion also removes legacy metadata and
+login references. Inventory saves do not contact FMC or FTD.

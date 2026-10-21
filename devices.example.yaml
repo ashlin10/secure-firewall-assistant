@@ -5,5 +5,5 @@ devices:
     hostname: fmc.example.invalid
     https_port: 443
     ssh_port: 22
-# Accounts are configured separately through local hidden terminal entry.
-credentials: {}
+    username: ""
+    password: ""

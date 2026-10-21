@@ -1,4 +1,12 @@
-# Validation report — 19 October 2026
+# Validation report — 21 October 2026
+
+## 0.3.6 inventory accounts and deletion
+
+- Local suite: 95 tests passed, including stdio discovery, password migration and rotation, blank-password preservation, deletion of legacy entries, empty inventories, and restoration after a failed YAML write.
+- Component bridge checks cover six input fields, password whitespace, clearing entered passwords after save, trash actions, and explicit deletion payloads.
+- Ruff passed for changed runtime modules and enrollment tests. Package checks validated version consistency and reproducible archives.
+- Installed and refreshed the local plugin and pinned the standalone MCP registration to the exact installed release. A real stdio client verified version 0.3.6, all 16 tools, the app-only save/deletion schema, the resource's username/password/trash controls, and inventory output without password values. No devices were contacted.
+- Actual updated form rendering in the current desktop session requires a host restart. Live FMC authentication and Windows execution were not tested.
 
 ## 0.3.5 device inventory update
 

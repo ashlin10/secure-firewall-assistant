@@ -17,3 +17,4 @@ devices.yaml.lock
 private/
 evidence/
 .env
+.sfa-devices-*.backup

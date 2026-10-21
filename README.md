@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.3.5
+# Secure Firewall Assistant 0.3.6
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and
@@ -16,7 +16,7 @@ required. Work/model usage follows your ChatGPT plan and workspace settings.
    in PowerShell. Follow organizational script/signing policy; do not disable it.
 4. Restart ChatGPT desktop. Open **Plugins**, select your personal marketplace,
    install **Secure Firewall Assistant**, and start a new **local Work** chat.
-5. Ask “Open device inventory” to edit device names, hostnames/IP addresses, HTTPS ports, and SSH ports. Saving updates only local YAML; configure credentials separately if needed. See [ENROLLMENT.md](docs/ENROLLMENT.md).
+5. Ask “Open device inventory” to edit device details, usernames, and passwords, or delete devices using the trash icon. Saving stores credentials in clear text under each device in local YAML. See [ENROLLMENT.md](docs/ENROLLMENT.md).
 6. Mention the plugin and request a read-only check first.
 
 Use the **release directory printed by the installer** for management commands.
