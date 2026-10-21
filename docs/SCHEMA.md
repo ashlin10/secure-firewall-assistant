@@ -44,3 +44,31 @@ To maintain a new schema, run `scripts/import_schema.py` with the new reference,
 review transformations/diffs and unresolved refs, add meaningful tests, update
 provenance/compatibility notes, and release through the normal PR process. Do not
 point a user installation at an unreviewed arbitrary downloaded schema.
+
+## Efficient multi-item execution
+
+Discovery and description expose `execution_options` for every REST method. The
+current schema declares a `bulk` query parameter on 54 POST, 19 PUT, and 41 DELETE
+operations. `bulk_only=true` filters discovery across these methods. Array body
+support is separately resolved from local schema references; a bulk parameter
+alone does not prove an array body is supported. No unlisted bulk flag is added.
+
+`execute_configuration_batch` accepts 1–1000 independent collection-create bodies.
+It preflights every body, checks compatibility once under the target lock, and
+uses declared native bulk in chunks of at most 100. Without native bulk it uses
+at most four concurrent POSTs on a shared authenticated client. Authentication
+and token refresh retain their lock. Dependent creates and ordered rules should
+use sequential execution. Each batch performs a complete collection GET and
+compares every returned UUID against its requested fields, without requiring
+collection ordering or a separate GET per created item.
+
+Errors stop scheduling new requests; in-flight requests finish and retain their
+receipts. Writes are never replayed. Async responses and missing identifiers
+require reconciliation or task polling, and incomplete reads cannot establish
+success. Inspect item statuses before resuming only missing items. Batch PUT and
+DELETE remain available through their exact schema-defined ordinary executor,
+with current reads and documented body/filter requirements.
+
+The VPN endpoint POST has no bulk parameter or array body in this catalog.
+Cisco's 10.1 REST object documentation lists the same parameters. This is a
+catalog limitation, not a claim that undocumented bulk behavior was tested.

@@ -78,3 +78,16 @@ def test_errors_never_contain_rejected_payload_values(catalog):
     with pytest.raises(AssistantError) as error:
         catalog.validate({"type": "integer"}, sentinel)
     assert sentinel not in json.dumps(error.value.result())
+
+
+def test_execution_options_cover_all_methods_and_do_not_invent_endpoint_bulk(catalog):
+    counts = {}
+    for method in ("post", "put", "delete"):
+        page = catalog.search(method=method, bulk_only=True)
+        counts[method] = page["total"]
+        assert all(o["execution_options"]["bulk_parameter"] for o in page["operations"])
+    assert counts == {"post": 54, "put": 19, "delete": 41}
+    assert catalog.options("createMultipleNetworkObject")["bulk_create_supported"] is True
+    assert catalog.describe("createVpnEndpoint")["execution_options"]["bulk_create_supported"] is False
+    assert catalog.options("getAllNetworkObject")["pagination"] == {
+        "supported": True, "expanded": True, "filter": True}

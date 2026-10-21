@@ -83,7 +83,8 @@ class Catalog:
             raise AssistantError("unknown_operation", "Choose an operation from the local schema catalog.")
         return self.operations[op_id]
 
-    def search(self, query: str = "", method: str = "", offset: int = 0, limit: int = 15) -> dict:
+    def search(self, query: str = "", method: str = "", offset: int = 0, limit: int = 15,
+               bulk_only: bool = False) -> dict:
         def singular(word):
             if word.endswith("ies"):
                 return word[:-3] + "y"
@@ -93,6 +94,8 @@ class Catalog:
         matches = []
         for op in self.operations.values():
             if method and op["method"] != method.lower():
+                continue
+            if bulk_only and not self.options(op["id"])["bulk_parameter"]:
                 continue
             text = (op["id"] + " " + op["path"] + " " + op["definition"].get("description", "") +
                     " " + " ".join(op["definition"].get("tags", []))).lower()
@@ -106,7 +109,8 @@ class Catalog:
         matches.sort(key=lambda x: (-x[0], x[1]["id"]))
         offset, limit = max(0, offset), max(1, min(30, limit))
         return {"total": len(matches), "offset": offset, "operations": [
-            {k: o[k] for k in ("id", "method", "path", "effect")} for _, o in matches[offset:offset + limit]],
+            {**{k: o[k] for k in ("id", "method", "path", "effect")},
+             "execution_options": self.options(o["id"])} for _, o in matches[offset:offset + limit]],
             "next_offset": offset + limit if offset + limit < len(matches) else None}
 
     def describe(self, op_id: str) -> dict:
@@ -117,6 +121,7 @@ class Catalog:
                 "description": definition.get("description", ""),
                 "parameters": [self.resolve(p) for p in op["parameters"]],
                 "request_body": body,
+                "execution_options": self.options(op_id),
                 "responses": {k: {"description": self.resolve(v).get("description"),
                                   "content": {t: {"schema": c.get("schema")} for t, c in
                                               self.resolve(v).get("content", {}).items()}}
@@ -124,6 +129,34 @@ class Catalog:
                 "execution_available": op["effect"] in {"read", "configuration", "deployment"},
                 "notes": ["Schema coverage is not device verification.",
                           "Use describe_schema for referenced component definitions."]}
+
+    def options(self, op_id: str) -> dict:
+        """Expose capabilities for every method; never infer bulk support from a name."""
+        op = self.get(op_id)
+        parameters = [self.resolve(p) for p in op["parameters"]]
+        query = {p["name"]: p.get("schema", {}) for p in parameters if p["in"] == "query"}
+        request = self.resolve(op["definition"].get("requestBody", {}))
+        media = request.get("content", {})
+        schema = media.get("application/json", {}).get("schema", {})
+
+        def accepts_array(value, seen=frozenset()):
+            if "$ref" in value:
+                if value["$ref"] in seen:
+                    return False
+                return accepts_array(self.resolve(value), seen | {value["$ref"]})
+            if value.get("type") == "array":
+                return True
+            return any(accepts_array(v, seen) for key in ("oneOf", "anyOf") for v in value.get(key, []))
+
+        array = accepts_array(schema)
+        bulk = "bulk" in query
+        return {"bulk_parameter": bulk, "array_body": array,
+                "bulk_create_supported": op["method"] == "post" and bulk and array,
+                "query_parameters": list(query), "request_media_types": list(media),
+                "pagination": {"supported": {"offset", "limit"}.issubset(query),
+                               "expanded": "expanded" in query, "filter": "filter" in query},
+                "async_response_documented": "202" in op["definition"].get("responses", {}),
+                "support_basis": "local_schema; confirm observed device compatibility"}
 
     def schema(self, name: str) -> dict:
         if name not in self.doc.get("components", {}).get("schemas", {}):

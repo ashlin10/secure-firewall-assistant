@@ -1,4 +1,6 @@
-# Secure Firewall Assistant 0.3.7
+# Secure Firewall Assistant 0.3.8
+
+Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
 Lab HTTPS connections accept self-signed certificates by default. Set `verify_ssl: true` in a device’s local YAML metadata, enroll with `--verify-ssl`, or supply `--ca-bundle` to enable certificate and hostname verification. HTTPS remains encrypted; the default does not authenticate the server certificate.
 

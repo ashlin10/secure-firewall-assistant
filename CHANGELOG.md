@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.8
+
+- Expose execution options for all REST methods, including bulk, array bodies, filtering, pagination, media types, and async responses; add bulk-only discovery.
+- Add independent-create batch execution that selects declared native bulk, otherwise uses up to four concurrent supported POSTs, with one compatibility check and complete collection verification.
+- Validate the full batch before writing; stop scheduling on errors or async acceptance, retain per-item receipts, and never replay uncertain writes.
+- Require capability inspection before large jobs and reconciliation of partial outcomes within the original parent resource.
+
 ## 0.3.7
 
 - Accept self-signed HTTPS certificates and hostname mismatches by default for lab FMCs, including existing inventory.

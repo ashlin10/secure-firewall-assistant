@@ -100,39 +100,40 @@ class FMC:
                 headers: dict | None = None, body=None) -> dict:
         if not path.startswith("/api/") or ".." in path or "?" in path or "#" in path or "\\" in path:
             raise AssistantError("invalid_api_path", "Only a catalog-generated API path is accepted.")
-        with self.lock:
-            self.authenticate()
-            for attempt in range(3):
-                request_headers = {"Accept": "application/json", **(headers or {}), "X-auth-access-token": self.access}
-                params = {k: str(v).lower() if isinstance(v, bool) else v for k, v in (query or {}).items()}
-                response = self._send(method.upper(), path, params=params, headers=request_headers,
-                                      **({"json": body} if body is not None else {}))
-                # Retry only reads. Never replay a write after an uncertain network/server outcome.
-                if response.status_code == 401 and method.lower() == "get" and attempt == 0:
-                    self.authenticate(force=True)
-                    continue
-                if response.status_code in (429, 502, 503) and method.lower() == "get" and attempt < 2:
-                    try:
-                        delay = min(2.0, max(0.1, float(response.headers.get("Retry-After", 0.25))))
-                    except ValueError:
-                        delay = 0.25
-                    time.sleep(delay)
-                    continue
-                break
-            if 300 <= response.status_code < 400:
-                raise AssistantError("redirect_rejected", "FMC redirected the request. Update the enrolled origin; redirects are not followed.", status=response.status_code)
-            try:
-                result_body = response.json() if response.content else None
-            except ValueError:
-                raise AssistantError("unsupported_response", "FMC returned a non-JSON response; this release supports JSON APIs only.", status=response.status_code) from None
-            if not 200 <= response.status_code < 300:
-                raise AssistantError("fmc_api_error", "FMC rejected the request.", status=response.status_code,
-                                     api_error=self.redactor.clean(result_body),
-                                     outcome="unknown" if method.lower() != "get" and response.status_code >= 500 else "rejected",
-                                     retry_write=False)
-            return {"status": response.status_code, "body": result_body,
-                    "request_id": response.headers.get("X-Request-ID"),
-                    "asynchronous": response.status_code == 202}
+        # HTTPX supports shared clients across threads. Authentication remains locked;
+        # independent configuration creates may overlap within the batch worker bound.
+        self.authenticate()
+        for attempt in range(3):
+            request_headers = {"Accept": "application/json", **(headers or {}), "X-auth-access-token": self.access}
+            params = {k: str(v).lower() if isinstance(v, bool) else v for k, v in (query or {}).items()}
+            response = self._send(method.upper(), path, params=params, headers=request_headers,
+                                  **({"json": body} if body is not None else {}))
+            # Retry only reads. Never replay a write after an uncertain network/server outcome.
+            if response.status_code == 401 and method.lower() == "get" and attempt == 0:
+                self.authenticate(force=True)
+                continue
+            if response.status_code in (429, 502, 503) and method.lower() == "get" and attempt < 2:
+                try:
+                    delay = min(2.0, max(0.1, float(response.headers.get("Retry-After", 0.25))))
+                except ValueError:
+                    delay = 0.25
+                time.sleep(delay)
+                continue
+            break
+        if 300 <= response.status_code < 400:
+            raise AssistantError("redirect_rejected", "FMC redirected the request. Update the enrolled origin; redirects are not followed.", status=response.status_code)
+        try:
+            result_body = response.json() if response.content else None
+        except ValueError:
+            raise AssistantError("unsupported_response", "FMC returned a non-JSON response; this release supports JSON APIs only.", status=response.status_code) from None
+        if not 200 <= response.status_code < 300:
+            raise AssistantError("fmc_api_error", "FMC rejected the request.", status=response.status_code,
+                                 api_error=self.redactor.clean(result_body),
+                                 outcome="unknown" if method.lower() != "get" and response.status_code >= 500 else "rejected",
+                                 retry_write=False)
+        return {"status": response.status_code, "body": result_body,
+                "request_id": response.headers.get("X-Request-ID"),
+                "asynchronous": response.status_code == 202}
 
     def version(self, refresh: bool = False) -> str:
         if refresh or self.server_version is None:

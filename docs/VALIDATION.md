@@ -1,5 +1,12 @@
 # Validation report — 21 October 2026
 
+## 0.3.8 capability discovery and efficient batches
+
+- 108 automated tests cover the existing suite plus native bulk selection, all-method capability discovery, full-batch preflight, real bounded non-bulk concurrency, one collection verification, mismatches, async acceptance, and failure receipts without write replay.
+- Ruff and reproducible plugin/source packaging pass. The maintained OpenAPI snapshot is unchanged; no undocumented VPN endpoint bulk parameter was added.
+- Batch creates retain target locking, secret-reference resolution, ordinary-configuration guards, explicit deployment separation, and complete saved-state verification. Independent network requests overlap while authentication and token refresh remain locked.
+- Host process refresh and live FMC compatibility require separate installation and device checks; automated results alone do not establish either.
+
 ## 0.3.7 optional lab TLS verification
 
 - 98 automated tests passed; Ruff and plugin/source package validation passed.

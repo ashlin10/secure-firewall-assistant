@@ -19,13 +19,15 @@ and special operational APIs. Use preview_deployment and deploy_configuration on
 current deployment request, with all pending changes on named devices authorized. Device passwords are entered only in the inventory app or local terminal, never in chat.
 Configuration secret fields use local $secret references. Saved FMC configuration is not proof of FTD
 runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state, and deployment state.
+Inspect execution_options for every method before large jobs. Prefer declared native bulk;
+use execute_configuration_batch for independent creates, never guess bulk support.
 """
 
 
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.3.7", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.3.8", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -97,8 +99,9 @@ def build_server(assistant: Assistant | None = None):
         return assistant.connect(target)
 
     @expose("discover_operations", "Search supported schema operations. Special operational writes are cataloged but blocked in v1.")
-    def discover(query: str = "", method: str = "", offset: int = 0, limit: int = 15) -> dict:
-        return assistant.catalog.search(query, method, offset, limit)
+    def discover(query: str = "", method: str = "", offset: int = 0, limit: int = 15,
+                 bulk_only: bool = False) -> dict:
+        return assistant.catalog.search(query, method, offset, limit, bulk_only)
 
     @expose("describe_operation", "Get path, parameters, body schema references, effects, and response schemas.")
     def describe(operation_id: str) -> dict:
@@ -120,6 +123,14 @@ def build_server(assistant: Assistant | None = None):
                 header_parameters: dict | None = None, body: dict | list | None = None) -> dict:
         return assistant.execute(target, operation_id, authorization_request,
                                  path_parameters, query_parameters, header_parameters, body)
+
+    @expose("execute_configuration_batch", "Create independent resources efficiently: declared native bulk in bounded chunks, otherwise up to four concurrent POSTs. Validates all bodies first, verifies by a complete collection read, stops scheduling on failure, never retries writes or deploys. Inspect per-item receipts before resuming partial work. Do not batch dependent creates or ordered policy rules.", write=True)
+    def execute_batch(target: str, operation_id: str, authorization_request: str, items: list[dict],
+                      path_parameters: dict | None = None, query_parameters: dict | None = None,
+                      header_parameters: dict | None = None, batch_size: int = 100,
+                      max_workers: int = 4) -> dict:
+        return assistant.execute_batch(target, operation_id, authorization_request, items,
+                                       path_parameters, query_parameters, header_parameters, batch_size, max_workers)
 
     @expose("verify_configuration", "Compare a complete GET result against expected JSON. Object keys may be a subset; lists require matching length and order. Does not prove runtime behavior.")
     def verify(target: str, operation_id: str, expected: dict | list,

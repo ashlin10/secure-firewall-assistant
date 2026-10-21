@@ -2,6 +2,8 @@ import hashlib
 import json
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 from .catalog import Catalog
 from .errors import AssistantError
@@ -36,7 +38,7 @@ class Assistant:
             client.close()
 
     def health(self) -> dict:
-        return {"version": "0.3.7", "devices_enrolled": len(self.state.aliases()),
+        return {"version": "0.3.8", "devices_enrolled": len(self.state.aliases()),
                 "schema": self.catalog.provenance, "network_access_tested": False,
                 "credential_file": str(self.secrets.path),
                 "runtime_writes": "deployment tool only; special operational APIs disabled",
@@ -187,6 +189,102 @@ class Assistant:
         except AssistantError as error:
             return {"status": "verification_failed", "error": error.result()["error"],
                     "note": "Write was accepted. Do not repeat it; reconcile with a read."}
+
+    def execute_batch(self, target, op_id, authorization_request, items, path=None, query=None,
+                      headers=None, batch_size=100, max_workers=4):
+        """Native bulk when declared; otherwise bounded independent POSTs, one collection read-back."""
+        op = self.catalog.get(op_id)
+        if op["effect"] != "configuration" or op["method"] != "post":
+            raise AssistantError("operation_guard", "Batch execution accepts independent configuration creates only.")
+        if not authorization_request.strip():
+            raise AssistantError("request_scope_required", "Supply the current user's configuration request.")
+        if (not isinstance(items, list) or not 1 <= len(items) <= 1000 or
+                any(not isinstance(x, dict) for x in items)):
+            raise AssistantError("invalid_batch", "Supply 1–1000 independent object bodies.")
+        if type(batch_size) is not int or not 1 <= batch_size <= 100:
+            raise AssistantError("invalid_batch_size", "Use a batch size from 1 to 100.")
+        if type(max_workers) is not int or not 1 <= max_workers <= 4:
+            raise AssistantError("invalid_workers", "Use 1–4 concurrent independent creates.")
+        collection = next((o for o in self.catalog.operations.values()
+                           if o["method"] == "get" and o["path"] == op["path"]), None)
+        if not collection or "{objectId}" in op["path"]:
+            raise AssistantError("batch_collection_required", "Batch creates require a readable collection path.")
+        with self.state.target_lock(target):
+            client = self.client(target)
+            client.require_write_compatibility()
+            path = path or {}
+            query = self.secrets.resolve(query or {})
+            headers = self.secrets.resolve(headers or {})
+            items = self.secrets.resolve(items)
+            bulk = self.catalog.options(op_id)["bulk_create_supported"]
+            if "bulk" in query and query["bulk"] is not bulk:
+                raise AssistantError("batch_bulk_conflict", "The batch executor chooses bulk from declared capabilities.")
+            query = {**query, **({"bulk": bulk} if self.catalog.options(op_id)["bulk_parameter"] else {})}
+            chunks = [(i, items[i:i + batch_size]) for i in range(0, len(items), batch_size)] if bulk else list(enumerate(items))
+            # Validate every item/chunk before the first write, including secrets and domain.
+            for _, body in chunks:
+                self.catalog.prepare(op_id, path, query, headers, body, client.domain)
+            stopped = Event()
+
+            def submit(chunk):
+                index, body = chunk
+                expected = body if bulk else [body]
+                if stopped.is_set():
+                    return [{"index": index + j, "status": "not_attempted"} for j in range(len(expected))]
+                try:
+                    result = self._call(target, op_id, path, query, headers, body)
+                    payload = result["body"]
+                    returned = payload.get("items", [payload]) if isinstance(payload, dict) else payload
+                    if result["asynchronous"] or not isinstance(returned, list) or len(returned) != len(expected):
+                        stopped.set()
+                        return [{"index": index + j, "status": "pending_async" if result["asynchronous"] else "reconcile_required",
+                                 "response": result} for j in range(len(expected))]
+                    receipts = []
+                    for j, created in enumerate(returned):
+                        identifier = created.get("id") if isinstance(created, dict) else None
+                        if not identifier:
+                            stopped.set()
+                        receipts.append({"index": index + j, "id": identifier,
+                                         "status": "accepted" if identifier else "reconcile_required",
+                                         "schema_warnings": result["schema_warnings"]})
+                    return receipts
+                except AssistantError as error:
+                    stopped.set()
+                    return [{"index": index + j, "status": "reconcile_required",
+                             "error": error.result()["error"]} for j in range(len(expected))]
+                except Exception:
+                    stopped.set()
+                    return [{"index": index + j, "status": "reconcile_required",
+                             "error": {"code": "batch_request_failed", "outcome": "unknown", "retry_write": False}}
+                            for j in range(len(expected))]
+
+            if bulk or max_workers == 1:
+                receipts = [receipt for chunk in chunks for receipt in submit(chunk)]
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    receipts = [receipt for group in executor.map(submit, chunks) for receipt in group]
+            verification = {"status": "requires_explicit_verification"}
+            try:
+                observed = self._read(target, collection["id"], path, all_pages=True, headers=headers)
+                if observed["complete"]:
+                    by_id = {x["id"]: x for x in observed["body"].get("items", []) if isinstance(x, dict) and "id" in x}
+                    for receipt in receipts:
+                        if receipt["status"] == "accepted":
+                            actual = by_id.get(receipt["id"])
+                            receipt["mismatches"] = compare(items[receipt["index"]], actual)
+                            receipt["status"] = "mismatch" if receipt["mismatches"] else "verified_in_fmc"
+                    verification = {"status": "verified_in_fmc" if all(r["status"] == "verified_in_fmc" for r in receipts)
+                                    else "partial_or_unverified", "collection_complete": True}
+                else:
+                    verification = {"status": "verification_incomplete"}
+            except AssistantError as error:
+                verification = {"status": "verification_failed", "error": error.result()["error"]}
+            counts = {status: sum(r["status"] == status for r in receipts) for status in {r["status"] for r in receipts}}
+            return self.record(target, op_id, {"items": receipts, "counts": counts,
+                               "strategy": "native_bulk" if bulk else "bounded_independent_creates",
+                               "max_workers": 1 if bulk else max_workers, "requested": len(items)},
+                               authorization_request=authorization_request, verification=verification,
+                               note="Never replay uncertain or partially accepted batches. Reconcile saved state before retrying.")
 
     def verify(self, target: str, op_id: str, expected, path=None, query=None, exact=False, headers=None) -> dict:
         # Prevent credential values from being copied into comparison requests or artifacts.

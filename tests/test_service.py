@@ -131,3 +131,94 @@ def test_unknown_alias_and_cross_domain_are_rejected(assistant, lab):
     with pytest.raises(AssistantError) as error:
         assistant.read("lab-fmc-1", "getAllNetworkObject", path={"domainUUID": "other"})
     assert error.value.code == "domain_mismatch"
+
+
+def test_batch_uses_native_bulk_and_one_collection_verification(assistant, lab):
+    bodies = [{**NETWORK, "name": f"network-{i}"} for i in range(4)]
+    result = assistant.execute_batch("lab-fmc-1", "createMultipleNetworkObject", "Create four networks", bodies)
+    assert result["result"]["strategy"] == "native_bulk"
+    assert result["result"]["counts"] == {"verified_in_fmc": 4}
+    posts = [r for r in lab.calls if r.method == "POST" and r.url.path.endswith("networks")]
+    assert len(posts) == 1 and posts[0].url.params["bulk"] == "true"
+    gets = [r for r in lab.calls if r.method == "GET" and "/object/networks" in r.url.path]
+    assert len(gets) == 1 and gets[0].url.path.endswith("networks")
+    assert result["deployment_performed"] is False
+
+
+def test_batch_preflight_invalid_later_item_prevents_all_writes(assistant, lab):
+    with pytest.raises(AssistantError):
+        assistant.execute_batch("lab-fmc-1", "createMultipleNetworkObject", "Create networks",
+                                [NETWORK, {"type": "Network"}], batch_size=1)
+    assert not any(r.method == "POST" and r.url.path.endswith("networks") for r in lab.calls)
+
+
+@pytest.mark.parametrize("operation", ["createDeploymentRequest", "createBulkCommand", "updateNetworkObject"])
+def test_batch_retains_operation_guards(assistant, lab, operation):
+    with pytest.raises(AssistantError) as error:
+        assistant.execute_batch("lab-fmc-1", operation, "Create resources", [NETWORK])
+    assert error.value.code == "operation_guard"
+    assert not lab.calls
+
+
+def test_batch_never_replays_uncertain_bulk_or_sends_next_chunk(assistant, lab):
+    def fail(request):
+        if request.method == "POST" and request.url.path.endswith("networks"):
+            return httpx.Response(503, json={"error": {"messages": []}})
+    lab.override = fail
+    result = assistant.execute_batch("lab-fmc-1", "createMultipleNetworkObject", "Create networks",
+                                     [NETWORK, {**NETWORK, "name": "other"}], batch_size=1)
+    assert result["result"]["counts"] == {"reconcile_required": 1, "not_attempted": 1}
+    assert result["verification"]["status"] == "partial_or_unverified"
+    assert len([r for r in lab.calls if r.method == "POST" and r.url.path.endswith("networks")]) == 1
+
+
+def test_batch_collection_mismatch_cannot_pass(assistant, lab):
+    def lie(request):
+        if request.method == "GET" and request.url.path.endswith("networks"):
+            return httpx.Response(200, json={"items": []})
+    lab.override = lie
+    result = assistant.execute_batch("lab-fmc-1", "createMultipleNetworkObject", "Create network", [NETWORK])
+    assert result["result"]["counts"] == {"mismatch": 1}
+
+
+def test_batch_nonbulk_concurrency_is_bounded_and_real(assistant, lab):
+    import threading
+    active = 0
+    maximum = 0
+    lock = threading.Lock()
+    barrier = threading.Barrier(2)
+    def endpoints(request):
+        nonlocal active, maximum
+        if request.url.path.endswith("endpoints"):
+            if request.method == "POST":
+                data = json.loads(request.content)
+                assert "bulk" not in request.url.params
+                with lock:
+                    active += 1
+                    maximum = max(maximum, active)
+                barrier.wait(timeout=5)
+                name = data["extranetInfo"]["name"]
+                created = {**data, "id": name}
+                with lock:
+                    lab.objects[name] = created
+                    active -= 1
+                return httpx.Response(201, json=created)
+            return httpx.Response(200, json={"items": list(lab.objects.values()), "paging": {"pages": 1}})
+    lab.override = endpoints
+    bodies = [{"peerType": "SPOKE", "extranet": True,
+               "extranetInfo": {"name": f"spoke-{i}", "ipAddress": f"198.18.0.{i+1}"}} for i in range(4)]
+    result = assistant.execute_batch("lab-fmc-1", "createVpnEndpoint", "Create independent spokes", bodies,
+                                     path={"containerUUID": "vpn-1"}, max_workers=2)
+    assert maximum == 2
+    assert result["result"]["counts"] == {"verified_in_fmc": 4}
+    assert result["result"]["strategy"] == "bounded_independent_creates"
+
+
+def test_batch_async_is_pending_not_verified(assistant, lab):
+    def pending(request):
+        if request.method == "POST" and request.url.path.endswith("networks"):
+            return httpx.Response(202, json={"id": "task-1"})
+    lab.override = pending
+    result = assistant.execute_batch("lab-fmc-1", "createMultipleNetworkObject", "Create network", [NETWORK])
+    assert result["result"]["counts"] == {"pending_async": 1}
+    assert result["verification"]["status"] != "verified_in_fmc"
