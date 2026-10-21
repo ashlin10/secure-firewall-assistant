@@ -4,21 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "secure-firewall-assistant"
-version = "0.3.2"
+version = "0.3.4"
 description = "Local, schema-driven Cisco Secure Firewall tools for ChatGPT Work"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "mcp>=2.3,<3",
   "httpx>=0.28,<0.29",
   "jsonschema>=4.26,<5",
-  "keyring>=25.7,<26",
   "paramiko>=5.1,<6",
   "platformdirs>=4.13,<5",
   "filelock>=3.20,<4",
+  "pyyaml>=6,<7",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff>=0.12,<1", "pyyaml>=6,<7"]
+dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff>=0.12,<1"]
 
 [project.scripts]
 secure-firewall-assistant = "secure_firewall_assistant.cli:main"

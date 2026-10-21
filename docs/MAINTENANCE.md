@@ -10,7 +10,7 @@ list and excludes virtual environments, dependency caches, and private state.
 Protect the main/release branches. Teammates propose changes through pull
 requests; maintainers review API effects, credential handling, and expected-vs-
 observed verification. Use the included macOS/Windows CI matrix. Unit and stdio
-tests use synthetic stores/devices; native store and live-device testing are
+tests use synthetic stores/devices; local YAML permissions and live-device testing are
 separate pilot checks. CI configuration is supplied but has not run remotely.
 
 Bump the version in `pyproject.toml`, `plugin.json`, `__init__.py`, service/server
@@ -28,11 +28,11 @@ per-user installer is the baseline; workspace import alone is not a dependency
 installer. Do not combine an untested workspace policy with claims of unattended
 cross-platform installation.
 
-Installation/upgrades never enroll credentials. Private state uses format v1;
-updating an enrollment makes an inventory backup. Future migrations must preserve
-native-store reference names, support rollback, back up before writing, and
-include state-preservation tests. No deletion of private state occurs during a
-normal update or software uninstall.
+Installation/upgrades never enroll credentials. `devices.yaml` stays beside the
+versioned release directories and is excluded from source copies and packages.
+The YAML format is versioned; updates preserve it, and normal uninstall does not
+delete it. Future migrations must support rollback, back up before writing, and
+include state-preservation checks.
 
 To add an operational API, implement and test its effects/authorization boundary
 explicitly. Do not weaken the generic deployment guard. To add a diagnostic

@@ -6,12 +6,20 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import yaml
 from filelock import FileLock
 from platformdirs import user_config_path, user_data_path
 
 from .errors import AssistantError
 
 ALIAS = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$")
+
+
+def plugin_root() -> Path:
+    package_root = Path(__file__).resolve().parents[2]
+    if (package_root / "installation.json").is_file() and package_root.parent.name == "releases":
+        return package_root.parent.parent
+    return package_root
 
 
 def private_dir(path: Path) -> Path:
@@ -69,26 +77,39 @@ class Device:
 
 
 class State:
-    def __init__(self, config: Path | None = None, data: Path | None = None):
+    def __init__(self, config: Path | None = None, data: Path | None = None,
+                 device_file: Path | None = None):
         override = os.environ.get("SFA_DATA_DIR")
         self.config = private_dir(config or (Path(override) / "config" if override else
                                             user_config_path("SecureFirewallAssistant", appauthor=False)))
         self.data = private_dir(data or (Path(override) / "data" if override else
                                        user_data_path("SecureFirewallAssistant", appauthor=False)))
         self.inventory_path = self.config / "inventory.json"
+        self.device_file = device_file or plugin_root() / "devices.yaml"
 
     def inventory(self) -> dict:
-        if not self.inventory_path.exists():
-            return {"format_version": 1, "devices": {}}
         try:
-            obj = json.loads(self.inventory_path.read_text(encoding="utf-8"))
+            obj = (json.loads(self.inventory_path.read_text(encoding="utf-8"))
+                   if self.inventory_path.exists() else {"format_version": 1, "devices": {}})
             if obj.get("format_version") != 1 or not isinstance(obj["devices"], dict):
                 raise ValueError
             for name, fields in obj["devices"].items():
                 if name != Device(**fields).alias:
                     raise ValueError
+            if self.device_file.exists():
+                local = yaml.safe_load(self.device_file.read_text(encoding="utf-8"))
+                if (not isinstance(local, dict) or local.get("format_version") != 1 or
+                        not isinstance(local.get("devices", {}), dict)):
+                    raise ValueError
+                for name, fields in local.get("devices", {}).items():
+                    device = Device(**fields)
+                    if name != device.alias:
+                        raise ValueError
+                    # Only validated metadata enters the in-memory inventory;
+                    # credential values remain in the local YAML store.
+                    obj["devices"][name] = asdict(device)
             return obj
-        except (ValueError, TypeError, KeyError):
+        except (OSError, UnicodeError, yaml.YAMLError, ValueError, TypeError, KeyError):
             raise AssistantError("inventory_invalid", "Inventory is invalid or uses an unsupported format; restore its backup.") from None
 
     def save_device(self, device: Device):

@@ -8,6 +8,7 @@ import secrets
 import threading
 import time
 import uuid
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -48,8 +49,13 @@ class EnrollmentUI:
     def start(self, kind, alias, address, username, domain=None):
         device = Device(kind=kind, alias=alias, address=address.rstrip("/"), username=username,
                         credential_ref=alias + "-auth", domain=domain)
-        if alias in self.state.inventory()["devices"]:
-            raise AssistantError("alias_exists", "This alias is already enrolled; no credential was changed.")
+        existing_fields = self.state.inventory()["devices"].get(alias)
+        if existing_fields:
+            existing = Device(**existing_fields)
+            if (existing.kind != device.kind or existing.address != device.address or
+                    existing.username != device.username):
+                raise AssistantError("alias_exists", "This alias already has different device details; no credential was changed.")
+            device = replace(existing, domain=domain if domain is not None else existing.domain)
         identifier, authorization = uuid.uuid4().hex, secrets.token_urlsafe(32)
         with self.lock:
             self.sessions = {key: value for key, value in self.sessions.items() if value["expires"] > time.time()}
@@ -99,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Vary", "Origin")
         if self.headers.get("Origin") == SANDBOX_ORIGIN:
             self.send_header("Access-Control-Allow-Origin", SANDBOX_ORIGIN)
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SFA-Enrollment")
             self.send_header("Access-Control-Allow-Private-Network", "true")
         self.end_headers()
@@ -111,23 +117,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.headers.get("Origin") != SANDBOX_ORIGIN or
                 not self.path.startswith("/enroll/")):
             return None
-        identifier = self.path.removeprefix("/enroll/")
+        path = self.path.removeprefix("/enroll/")
+        identifier = path.removesuffix("/probe") if path.endswith("/probe") else path
         with owner.lock:
             job = owner.sessions.get(identifier)
             if job and job["status"] == "waiting" and job["expires"] > time.time():
                 return job
         return None
 
+    def do_GET(self):
+        # A password-free probe lets the user confirm iframe-to-loopback access
+        # before entering a credential. The token is session-scoped and never
+        # returned to the model or written to logs.
+        job = self.job()
+        if (job is None or not self.path.endswith("/probe") or
+                not secrets.compare_digest(self.headers.get("X-SFA-Enrollment", ""), job["authorization"])):
+            return self.reply(403, {"ok": False, "message": "Enrollment connection unavailable or request rejected."})
+        return self.reply(200, {"ok": True})
+
     def do_OPTIONS(self):
-        if (not self.job() or self.headers.get("Access-Control-Request-Method") != "POST" or
+        if (not self.job() or self.headers.get("Access-Control-Request-Method") not in {"GET", "POST"} or
                 set(h.strip().lower() for h in self.headers.get("Access-Control-Request-Headers", "").split(",")) -
                 {"content-type", "x-sfa-enrollment"}):
             return self.reply(403, {"ok": False})
         return self.reply(200, {"ok": True})
-
-    def do_GET(self):
-        # There is deliberately no browser page and no endpoint reading credentials.
-        return self.reply(404, {"ok": False})
 
     def do_POST(self):
         # Consume bounded request bodies before rejecting authorization. Closing a
@@ -160,9 +173,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 # Native-store prompts can block. Status reads must remain available.
                 with owner.state.target_lock(device.alias):
-                    if device.alias in owner.state.inventory()["devices"]:
-                        return self.reply(409, {"ok": False, "message": "This alias is already enrolled."})
-                    owner.store.set(device.credential_ref, fields["password"])
+                    existing_fields = owner.state.inventory()["devices"].get(device.alias)
+                    if existing_fields and Device(**existing_fields) != device:
+                        return self.reply(409, {"ok": False, "message": "This alias now has different device details."})
+                    owner.store.set(device.credential_ref, fields["password"], device=device)
                     owner.state.save_device(device)
                 with owner.lock:
                     job["status"] = "enrolled"
@@ -175,4 +189,4 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError):
             return self.reply(400, {"ok": False, "message": "Invalid form submission."})
         except Exception:
-            return self.reply(500, {"ok": False, "message": "Could not save enrollment. Check local credential-store access and retry."})
+            return self.reply(500, {"ok": False, "message": "Could not save enrollment to local devices.yaml. Check the file and folder permissions, then retry."})

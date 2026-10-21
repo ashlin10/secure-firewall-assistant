@@ -69,7 +69,7 @@ def main():
             # Serialize enrollment against active operations and other setup processes.
             with state.target_lock(args.alias):
                 value = hidden_password()
-                secrets.set(device.credential_ref, value)
+                secrets.set(device.credential_ref, value, device=device)
                 state.save_device(device)
             result = {"ok": True, "alias": device.alias, "kind": device.kind,
                       "next_step": "Run check for an FMC, or trust-host for an optional FTD."}
@@ -100,7 +100,7 @@ def main():
         print(json.dumps(redactor.clean(error.result()), indent=2), file=sys.stderr)
         raise SystemExit(1) from None
     except Exception:
-        print("Local setup failed. Check file permissions and the native credential store; no exception details were logged.", file=sys.stderr)
+        print("Local setup failed. Check devices.yaml file permissions and format; no exception details were logged.", file=sys.stderr)
         raise SystemExit(1) from None
 
 

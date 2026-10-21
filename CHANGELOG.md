@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.4
+
+- Save local device details and credentials in an ignored `devices.yaml` beside the plugin; keep only a credential-free example in source packages.
+- Use the embedded ChatGPT enrollment form to enter device details and credentials.
+- Write the YAML atomically with restrictive Unix file permissions.
+
+## 0.3.3
+
+- Check local loopback access before showing password fields, with a short-lived authenticated probe.
+- Explain when the embedding app host blocks loopback access so users know no password was sent.
+
 ## 0.3.2
 
 - Make enrollment text readable in light/dark themes and remove domain/CA controls from the card.

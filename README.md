@@ -1,8 +1,8 @@
-# Secure Firewall Assistant 0.3.2
+# Secure Firewall Assistant 0.3.4
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and
-the native OS credential store. No hosted server, tunnel, or OpenAI API key is
+a local YAML credential file. No hosted server, tunnel, or OpenAI API key is
 required. Work/model usage follows your ChatGPT plan and workspace settings.
 
 ## Start here
@@ -16,7 +16,7 @@ required. Work/model usage follows your ChatGPT plan and workspace settings.
    in PowerShell. Follow organizational script/signing policy; do not disable it.
 4. Restart ChatGPT desktop. Open **Plugins**, select your personal marketplace,
    install **Secure Firewall Assistant**, and start a new **local Work** chat.
-5. Ask “Enroll FMC lab-fmc-1 at https://my-fmc using username api-user,” then enter the password in the embedded enrollment card. See [ENROLLMENT.md](docs/ENROLLMENT.md).
+5. Ask “Enroll a device” to open the embedded form, enter its details, then enter the password in the card. See [ENROLLMENT.md](docs/ENROLLMENT.md).
 6. Mention the plugin and request a read-only check first.
 
 Use the **release directory printed by the installer** for management commands.
@@ -57,8 +57,8 @@ stdio tool discovery/calls, package structure, and installer/update behavior in
 an isolated temporary home. See the validation report for exact results.
 
 **Requires your environment:** actual ChatGPT Work import and permissions, FMC
-version/RBAC and live API behavior, macOS Keychain enrollment, Windows native
-execution/Credential Manager, SSH prompts, browser availability, and live deployment.
+version/RBAC and live API behavior, local credential-file permissions, Windows
+execution, SSH prompts, browser availability, and live deployment.
 The assistant has not been installed into your ChatGPT account by this build.
 
 ## Maintenance

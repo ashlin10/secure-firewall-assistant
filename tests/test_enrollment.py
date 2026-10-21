@@ -8,20 +8,20 @@ from mcp import Client
 
 from secure_firewall_assistant.enrollment_ui import MIME, SANDBOX_ORIGIN, EnrollmentUI
 from secure_firewall_assistant.server import build_server
-from secure_firewall_assistant.state import State
+from secure_firewall_assistant.state import Device, State
 
 
 class Store:
     def __init__(self):
         self.values = {}
 
-    def set(self, reference, value):
+    def set(self, reference, value, device=None):
         self.values[reference] = value
 
 
 @pytest.fixture
 def form(tmp_path):
-    state = State(tmp_path / 'config', tmp_path / 'data')
+    state = State(tmp_path / 'config', tmp_path / 'data', tmp_path / 'devices.yaml')
     store = Store()
     ui = EnrollmentUI(state, store)
     result = ui.start('fmc', 'fixture', 'https://fmc.example.invalid:12202', 'tester')
@@ -73,10 +73,16 @@ def test_preflight_is_exact_and_no_browser_page_exists(form):
         'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type,x-sfa-enrollment'})
     assert response.status_code == 200
     assert response.headers['Access-Control-Allow-Private-Network'] == 'true'
+    probe_url = meta['endpoint'] + '/probe'
+    probe_preflight = httpx.options(probe_url, headers={'Origin': SANDBOX_ORIGIN,
+        'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'x-sfa-enrollment'})
+    assert probe_preflight.status_code == 200
+    assert httpx.get(probe_url, headers=headers(meta)).json() == {'ok': True}
+    assert httpx.get(probe_url, headers={**headers(meta), 'X-SFA-Enrollment': 'wrong'}).status_code == 403
     for change in [{'Access-Control-Request-Method': 'DELETE'}, {'Access-Control-Request-Headers': 'x-arbitrary'}]:
         assert httpx.options(meta['endpoint'], headers={'Origin': SANDBOX_ORIGIN,
             'Access-Control-Request-Method': 'POST', **change}).status_code == 403
-    assert httpx.get(meta['endpoint']).status_code == 404
+    assert httpx.get(meta['endpoint']).status_code == 403
 
 
 def test_invalid_fields_expiry_and_existing_alias_leave_credentials_untouched(form):
@@ -86,7 +92,8 @@ def test_invalid_fields_expiry_and_existing_alias_leave_credentials_untouched(fo
         assert response.status_code == 400
         assert 'synthetic-inline-value' not in response.text
     identifier = meta['endpoint'].rsplit('/', 1)[1]
-    state.save_device(ui.sessions[identifier]['device'])
+    state.save_device(Device('fixture', 'fmc', 'https://different.example.invalid',
+                             'other-user', 'fixture-auth'))
     assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 409
     ui.sessions[identifier]['expires'] = time.time() - 1
     assert httpx.post(meta['endpoint'], json=fields(), headers=headers(meta)).status_code == 403
@@ -108,12 +115,19 @@ def test_mcp_card_metadata_and_resource_roundtrip(assistant):
             assert len(resource['_meta']['ui']['csp']['connectDomains']) == 1
             html = resource['text']
             assert 'type="password"' in html and "'ui/initialize'" in html
+            assert 'Check local connection' in html and "'/probe'" in html
             assert "'ui/notifications/tool-result'" in html
             assert 'setWidgetState' not in html and 'console.log' not in html and 'window.open(' not in html
             result = (await client.call_tool('start_enrollment', {
                 'kind':'fmc','alias':'new-fixture','address':'https://example.invalid','username':'tester'})).model_dump(by_alias=True)
             assert 'endpoint' not in json.dumps(result['content'])
             assert 'authorization' not in json.dumps(result['structuredContent'])
+            public = result['structuredContent'] or json.loads(result['content'][0]['text'])
+            assert public['status'] == 'enter_device_details'
+            assert public['prefill']['alias'] == 'new-fixture'
+            result = (await client.call_tool('start_enrollment', {
+                'kind':'fmc','alias':'new-fixture','address':'https://example.invalid','username':'tester',
+                'confirm_details':True})).model_dump(by_alias=True)
             assert result['_meta']['enrollment']['endpoint'].startswith('http://127.0.0.1:')
             assert result['structuredContent']['status'] == 'waiting_for_private_form'
             assert 'enrollment_url' not in json.dumps(result)
@@ -142,10 +156,10 @@ def test_status_remains_responsive_during_native_store_prompt(form):
     entered, release = threading.Event(), threading.Event()
     original = store.set
 
-    def prompted_set(reference, value):
+    def prompted_set(reference, value, **kwargs):
         entered.set()
-        assert release.wait(5), 'test did not release synthetic native-store prompt'
-        original(reference, value)
+        assert release.wait(5), 'test did not release synthetic file-save wait'
+        original(reference, value, **kwargs)
 
     store.set = prompted_set
     identifier = meta['endpoint'].rsplit('/', 1)[1]

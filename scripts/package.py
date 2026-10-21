@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOP = {"plugin.json", "mcp.json", "pyproject.toml", "uv.lock", ".python-version", "README.md",
        "CHANGELOG.md", "CONTRIBUTING.md", "NOTICE.md", "Install.command", "Manage.command", "Install.ps1", "Manage.ps1"}
 TOP.add(".mcp.json")
+TOP.add("devices.example.yaml")
 DIRECTORIES = {"src", "skills", "docs", "scripts", ".codex-plugin"}
 EXCLUDED_PARTS = {"__pycache__", ".venv", ".pytest_cache", ".ruff_cache"}
 
@@ -65,7 +66,7 @@ def selected_files(root=ROOT, source=False):
             continue
         if path.is_symlink():
             raise ValueError("Symlinks are not permitted in release archives")
-        if path.suffix == ".pyc" or path.name in {"inventory.json", "installation.json", ".env"}:
+        if path.suffix == ".pyc" or path.name in {"inventory.json", "installation.json", ".env", "devices.yaml", "devices.yaml.lock"}:
             raise ValueError("Private/generated file appeared in the release include set")
         chosen.append(path)
     return chosen

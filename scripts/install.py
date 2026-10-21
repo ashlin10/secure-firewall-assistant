@@ -12,7 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 NAME = "secure-firewall-assistant"
-EXCLUDED = {".git", ".venv", ".pytest_cache", ".ruff_cache", "__pycache__", "dist", "build", ".github", "tests"}
+EXCLUDED = {".git", ".venv", ".pytest_cache", ".ruff_cache", "__pycache__", "dist", "build", ".github", "tests",
+            "devices.yaml", "devices.yaml.lock", ".sfa-devices-*.tmp"}
 
 
 def write_json(path, value):
@@ -32,7 +33,8 @@ def source_digest(source):
     digest = hashlib.sha256()
     for file in sorted(source.rglob("*")):
         rel = file.relative_to(source)
-        if file.is_file() and not any(p in EXCLUDED for p in rel.parts) and not file.name.startswith("."):
+        if (file.is_file() and not any(p in EXCLUDED for p in rel.parts) and
+                not file.name.startswith(".") and not file.name.startswith(".sfa-devices-")):
             digest.update(rel.as_posix().encode())
             digest.update(file.read_bytes())
     return digest.hexdigest()
@@ -105,7 +107,7 @@ def install(source: Path, home: Path | None = None, uv_binary: str | None = None
     for value in legacy.values():
         value.pop("type", None)
     write_json(destination / ".mcp.json", {"mcpServers": legacy})
-    # No local credentials are enrolled or read by installation or health checks.
+    # Installation and health checks do not modify or return credential values.
     runner([uv_binary, "sync", "--project", str(destination), "--frozen", "--no-dev"], check=True)
     environment = {**os.environ, "SFA_DATA_DIR": str(destination / ".installation-check")}
     try:

@@ -1,8 +1,15 @@
+import os
 import re
-import sys
+import tempfile
+from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
+import yaml
+from filelock import FileLock
+
 from .errors import AssistantError
+from .state import Device, plugin_root
 
 SENSITIVE = re.compile(
     r"password|passwd|secret|token|authorization|cookie|private.?key|community|pre.?shared|credential",
@@ -43,53 +50,74 @@ class Redactor:
 
 
 class SecretStore:
-    """Select a native backend explicitly; never accept plaintext fallback backends."""
+    """Store local lab credentials and device metadata in the ignored plugin YAML file."""
 
-    service = "com.secure-firewall-assistant.credentials.v1"
-
-    def __init__(self, redactor: Redactor):
+    def __init__(self, redactor: Redactor, path: Path | None = None):
         self.redactor = redactor
-        self._backend = None
+        self.path = path or plugin_root() / "devices.yaml"
 
-    @property
-    def backend(self):
-        if self._backend is None:
-            try:
-                if sys.platform == "darwin":
-                    from keyring.backends.macOS import Keyring
-                elif sys.platform == "win32":
-                    from keyring.backends.Windows import WinVaultKeyring as Keyring
-                else:
-                    raise AssistantError("unsupported_os", "This release supports macOS and Windows only.")
-                self._backend = Keyring()
-            except AssistantError:
-                raise
-            except Exception:
-                raise AssistantError("secret_store_unavailable", "The native credential store is unavailable.") from None
-        return self._backend
+    def _read(self) -> dict:
+        if not self.path.exists():
+            return {"format_version": 1, "devices": {}, "credentials": {}}
+        try:
+            value = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+            if (not isinstance(value, dict) or value.get("format_version") != 1 or
+                    not isinstance(value.get("devices", {}), dict) or
+                    not isinstance(value.get("credentials", {}), dict) or
+                    any(not isinstance(k, str) or not isinstance(v, str)
+                        for k, v in value.get("credentials", {}).items())):
+                raise ValueError
+            value.setdefault("devices", {})
+            value.setdefault("credentials", {})
+            return value
+        except (OSError, UnicodeError, yaml.YAMLError, ValueError, TypeError):
+            raise AssistantError("credential_file_invalid", "The local devices.yaml file is invalid; repair it from the sample file.") from None
+
+    def _write(self, value: dict):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".sfa-devices-", suffix=".tmp")
+        try:
+            if os.name != "nt":
+                os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as out:
+                yaml.safe_dump(value, out, sort_keys=False, allow_unicode=True)
+                out.flush()
+                os.fsync(out.fileno())
+            os.replace(temporary, self.path)
+            if os.name != "nt":
+                self.path.chmod(0o600)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
     def get(self, reference: str) -> str:
         self._check(reference)
         try:
-            value = self.backend.get_password(self.service, reference)
+            with FileLock(str(self.path) + ".lock", timeout=15):
+                value = self._read()["credentials"].get(reference)
         except AssistantError:
             raise
         except Exception:
-            raise AssistantError("secret_store_locked", "Unlock or repair the native credential store locally.") from None
+            raise AssistantError("credential_file_unavailable", "The local devices.yaml file could not be read.") from None
         if not value:
-            raise AssistantError("credential_missing", "Enroll this credential with the local enrollment utility.")
+            raise AssistantError("credential_missing", "Enroll this credential using the private enrollment card.")
         self.redactor.register(value)
         return value
 
-    def set(self, reference: str, value: str):
+    def set(self, reference: str, value: str, device: Device | None = None):
         self._check(reference)
         if not value:
             raise AssistantError("empty_credential", "A credential must not be empty.")
         self.redactor.register(value)
         try:
-            self.backend.set_password(self.service, reference, value)
+            with FileLock(str(self.path) + ".lock", timeout=15):
+                stored = self._read()
+                stored["credentials"][reference] = value
+                if device is not None:
+                    stored["devices"][device.alias] = asdict(device)
+                self._write(stored)
         except Exception:
-            raise AssistantError("secret_store_write_failed", "The native credential store could not save the credential.") from None
+            raise AssistantError("credential_file_write_failed", "The local devices.yaml file could not be saved.") from None
 
     @staticmethod
     def _check(reference: str):

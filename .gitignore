@@ -10,6 +10,9 @@ build/
 *.egg-info/
 .DS_Store
 inventory.json
+devices.yaml
+devices.yaml.lock
+.sfa-devices-*.tmp
 *.log
 private/
 evidence/

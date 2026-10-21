@@ -6,21 +6,23 @@
 @media(prefers-color-scheme:dark){:root{color-scheme:dark;color:#f1f5f9;background:#161d29;--muted:#cbd5e1;--surface:#202b3b;--border:#94a3b8;--notice:#25374f;--success:#bbf7d0;--error:#fecaca}}
 *{box-sizing:border-box}body{margin:0;padding:20px}main{max-width:560px;margin:auto}h2{font-size:20px;margin:0 0 8px}p{line-height:1.5}.muted{font-size:13px;color:var(--muted)}
 dl{display:grid;grid-template-columns:90px 1fr;gap:8px;margin:20px 0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}label{display:block;font-size:14px;margin-top:14px}
-input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:inherit;margin-top:6px}input::placeholder{color:var(--muted);opacity:1}button{font:inherit;font-weight:600;width:100%;padding:12px;border:0;border-radius:9px;color:#fff;background:#145ac2;margin-top:20px;cursor:pointer}button:disabled{opacity:.65;cursor:wait}#status{min-height:48px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--notice);overflow-wrap:anywhere}#status[data-state="success"]{color:var(--success)}#status[data-state="error"]{color:var(--error)}[hidden]{display:none!important}
+input,select{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:inherit;margin-top:6px}input::placeholder{color:var(--muted);opacity:1}button{font:inherit;font-weight:600;width:100%;padding:12px;border:0;border-radius:9px;color:#fff;background:#145ac2;margin-top:20px;cursor:pointer}button:disabled{opacity:.65;cursor:wait}#status{min-height:48px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--notice);overflow-wrap:anywhere}#status[data-state="success"]{color:var(--success)}#status[data-state="error"]{color:var(--error)}[hidden]{display:none!important}
 </style>
 <main><h2>Enroll device</h2><p class="muted">Secure Firewall Assistant · private local credentials</p>
 <p id="status" role="status" aria-live="polite">Connecting to the enrollment helper…</p>
 <form id="deviceForm" hidden>
+<label>Device type<select id="deviceKind"><option value="fmc">FMC</option><option value="ftd">FTD</option></select></label>
 <label>Device name<input id="deviceAlias" required maxlength="64" placeholder="FMCv-102"></label>
-<label>HTTPS address<input id="deviceAddress" required placeholder="https://my-fmc:443"></label>
+<label>Device address<input id="deviceAddress" required placeholder="https://my-fmc or ftd.example.invalid"></label>
 <label>Username<input id="deviceUsername" required autocomplete="username"></label>
 <button id="prepare" type="submit">Continue</button></form>
 <dl><dt>Device</dt><dd id="alias">—</dd><dt>Address</dt><dd id="address">—</dd><dt>Username</dt><dd id="username">—</dd></dl>
+<button id="probe" type="button" hidden>Check local connection</button>
 <form id="form" autocomplete="off" hidden>
 <label>Password<input id="password" type="password" required maxlength="4096" autocomplete="new-password"></label>
 <label>Repeat password<input id="repeat" type="password" required maxlength="4096" autocomplete="new-password"></label>
 <button id="save" type="submit">Save enrollment</button>
-<p class="muted">Password goes directly to your computer’s Keychain or Credential Manager. It is never sent in chat or an MCP tool call. This form expires after 10 minutes.</p>
+<p class="muted">Password goes directly to the local devices.yaml file beside the plugin. It is never sent in chat or an MCP tool call. Keep that file out of source control. This form expires after 10 minutes.</p>
 </form><button id="check" type="button" hidden>Check enrollment status</button></main>
 <script>
 (() => {
@@ -30,9 +32,9 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
   let session=null, expired=false, initialized=false, expiryTimer=null, requestTimer=null, savedAlias=null, savedKind=null;
   const send=(method,params,id)=>window.parent.postMessage({jsonrpc:'2.0',method,params,...(id===undefined?{}:{id})},'*');
   const clear=()=>{el('password').value='';el('repeat').value=''};
-  function prepare(alias,address,username){
+  function prepare(kind,alias,address,username){
     el('prepare').disabled=true;
-    send('tools/call',{name:'start_enrollment',arguments:{kind:'fmc',alias,address,username}},10);
+    send('tools/call',{name:'start_enrollment',arguments:{kind,alias,address,username,confirm_details:true}},10);
     status('Preparing private credential entry…');
   }
   function accept(result){
@@ -41,7 +43,12 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
       let publicData=result?.structuredContent;
       if(!publicData){try{publicData=JSON.parse(result?.content?.find(c=>c.type==='text')?.text||'{}')}catch{}}
       if(!session && publicData?.status==='enter_device_details'){
-        el('deviceForm').hidden=false;status('Enter the FMC details to continue.');
+        const prefill=publicData.prefill||{};
+        if(prefill.kind)el('deviceKind').value=prefill.kind;
+        for(const [id,key] of [['deviceAlias','alias'],['deviceAddress','address'],['deviceUsername','username']]){
+          if(prefill[key])el(id).value=prefill[key];
+        }
+        el('deviceForm').hidden=false;status('Enter or confirm the device details to continue.');
       }
       return;
     }
@@ -55,7 +62,7 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
     savedAlias=value.alias;savedKind=value.kind;
     const remaining=value.expires*1000-Date.now();
     if(remaining<=0){status('This form expired. Ask for a new enrollment form.');return}
-    el('form').hidden=false;status('Enter the device password below.');
+    el('probe').hidden=false;status('Check the secure connection before entering a password.');
     expiryTimer=setTimeout(()=>{expired=true;clear();el('form').hidden=true;session=null;status('This form expired. Ask for a new enrollment form.')},remaining);
     send('ui/notifications/size-changed',{width:560,height:650});
   }
@@ -70,6 +77,29 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
     send('tools/call',{name:'enrollment_status',arguments:{enrollment_id:new URL(session.endpoint).pathname.split('/').pop()}},11);
     clearTimeout(requestTimer);
     requestTimer=setTimeout(()=>{el('check').disabled=false;status('Enrollment status could not be confirmed. Return to chat and ask to check enrollment status before retrying.','error')},15000);
+  }
+  async function probeLocal(){
+    if(!session || expired)return;
+    const policy=document.permissionsPolicy||document.featurePolicy;
+    if(policy?.allowsFeature){
+      try{
+        if(!policy.allowsFeature('loopback-network')){
+          status('This app host blocks the enrollment card from reaching its local helper. No password was sent. The host must allow loopback access for this app.','error');
+          return;
+        }
+      }catch{}
+    }
+    el('probe').disabled=true;status('Checking secure access to the local enrollment helper…');
+    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),10000);
+    try{
+      const response=await fetch(session.endpoint+'/probe',{method:'GET',mode:'cors',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',signal:controller.signal,headers:{'X-SFA-Enrollment':session.authorization}});
+      const result=await response.json();
+      if(!response.ok || !result.ok)throw new Error('Local helper rejected the connection check.');
+      el('probe').hidden=true;el('form').hidden=false;status('Local connection verified. Enter the device password below.','success');
+      send('ui/notifications/size-changed',{width:560,height:650});
+    }catch{
+      status('The card cannot reach the local enrollment helper. The host may be blocking loopback access for this embedded app. No password was sent.','error');
+    }finally{clearTimeout(timeout);el('probe').disabled=false}
   }
   function enrolled(){
     clear();clearTimeout(expiryTimer);el('form').hidden=true;el('check').hidden=true;
@@ -91,19 +121,20 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
           const location=new URL(deepLink,'https://local.invalid');
           const p=location.searchParams;
           if(location.pathname==='/enroll' && p.get('alias') && p.get('address') && p.get('username')){
+            if(p.get('kind'))el('deviceKind').value=p.get('kind');
             for(const [id,key] of [['deviceAlias','alias'],['deviceAddress','address'],['deviceUsername','username']])el(id).value=p.get(key);
             el('deviceForm').hidden=false;status('Check the device details, then continue.');
           }
         }catch{status('Enter the device details to continue.')}
       }
     }
-    if(message.id===10){el('prepare').disabled=false;if(message.error || message.result?.isError){status('Could not prepare enrollment. Check the device name and address.');return}accept(message.result)}
+    if(message.id===10){el('prepare').disabled=false;const data=publicData(message.result);if(message.error || message.result?.isError || data.ok===false || data.error){status(data.error?.message||'Could not prepare enrollment. Check the device name and address.','error');return}accept(message.result)}
     if(message.id===11){
       clearTimeout(requestTimer);el('check').disabled=false;
       const data=publicData(message.result);
       if(data.status==='enrolled'){enrolled();return}
-      if(data.status==='saving'){status('Saving is still in progress. Complete the OS credential-store prompt, then check status again.');return}
-      if(data.status==='waiting'){el('save').disabled=false;el('check').hidden=true;status('Enrollment has not been saved yet. If an OS credential-store prompt is open, complete it and check status again before retrying.','error');return}
+      if(data.status==='saving'){status('Saving is still in progress. Check enrollment status again shortly.');return}
+      if(data.status==='waiting'){el('save').disabled=false;el('check').hidden=true;status('Enrollment has not been saved yet. Check local access, then retry.','error');return}
       el('form').hidden=true;status('Enrollment could not be confirmed or the form expired. Return to chat and request a fresh form.','error');
     }
     if(message.id===12){
@@ -115,17 +146,17 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
     if(message.method==='ui/notifications/tool-result')accept(message.params);
     if(message.method==='ui/resource-teardown'){clear();session=null;clearTimeout(expiryTimer);clearTimeout(requestTimer);window.parent.postMessage({jsonrpc:'2.0',id:message.id,result:{}},'*')}
   });
-  send('ui/initialize',{appInfo:{name:'Secure Firewall enrollment',version:'0.3.2'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
+  send('ui/initialize',{appInfo:{name:'Secure Firewall enrollment',version:'0.3.4'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
   // Compatibility path for hosts that deliver the initial result before bridge setup.
   const initial=window.openai?.toolResponseMetadata;
   if(initial)accept(initial.call_tool_result||initial.mcp_tool_result||initial);
-  el('deviceForm').addEventListener('submit',event=>{event.preventDefault();prepare(el('deviceAlias').value,el('deviceAddress').value,el('deviceUsername').value)});
+  el('deviceForm').addEventListener('submit',event=>{event.preventDefault();prepare(el('deviceKind').value,el('deviceAlias').value,el('deviceAddress').value,el('deviceUsername').value)});
   el('form').addEventListener('submit',async event=>{
     event.preventDefault();
     if(!session || expired)return;
     if(!el('password').value || el('password').value!==el('repeat').value){clear();status('Passwords must be nonempty and match.');return}
     const body=JSON.stringify({password:el('password').value,repeat:el('repeat').value});
-    clear();el('save').disabled=true;status('Saving to your local credential store… Complete any Keychain or Credential Manager prompt on this computer.');
+    clear();el('save').disabled=true;status('Saving to the local devices.yaml file…');
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),20000);
     try{
@@ -136,11 +167,12 @@ input{width:100%;font:inherit;padding:11px;border:1px solid var(--border);border
       }
       checkStatus();
     }catch{
-      // A lost response does not establish whether the native store saved it.
+      // A lost response does not establish whether the local YAML file was saved.
       el('check').hidden=false;
-      status('The save response did not arrive. Check enrollment status below before retrying. If it is still waiting, check local-network permissions and any OS credential-store prompt.','error');
+      status('The save response did not arrive. Check enrollment status below before retrying.','error');
     }finally{clearTimeout(timeout)}
   });
+  el('probe').addEventListener('click',probeLocal);
   el('check').addEventListener('click',checkStatus);
   window.addEventListener('pagehide',()=>{clear();session=null;clearTimeout(expiryTimer);clearTimeout(requestTimer)});
 })();

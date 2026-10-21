@@ -11,7 +11,7 @@ flowchart TD
   OpenAI[OpenAI reasoning services] <--> Work[ChatGPT desktop Work local task]
   Work <-->|local process pipes| Helper[Local MCP helper]
   Helper --> Inventory[Private per-user inventory]
-  Helper --> Vault[Native OS credential store]
+  Helper --> CredentialFile[Ignored local devices.yaml]
   Helper -->|HTTPS| FMC[Lab FMC]
   Helper -->|optional read-only SSH| FTD[Lab FTD]
   FMC -->|only explicit deployment request| FTD
@@ -52,12 +52,13 @@ fallback. A cloud connector cannot simply reach a user's `localhost`.
 
 ## Credentials and transport
 
-The helper explicitly chooses the macOS or Windows keyring backend. Inventory
-contains usernames and credential references, not passwords. Native stores
-remain under the local user's permissions. The helper has no tool for returning
-a password. Sensitive body fields accept local `$secret` references; authentication
-values are injected internally. Logs and evidence redact known secret values,
-sensitive keys, relevant field/value metadata, and private-key blocks.
+The helper stores device metadata and credentials in `devices.yaml` beside the
+plugin. Passwords are clear text in that local file. It is ignored by Git and
+excluded from release archives; Unix writes use owner-only permissions. The
+helper has no tool for returning a password. Sensitive body fields accept local
+`$secret` references; authentication values are injected internally. Logs and
+evidence redact known secret values, sensitive keys, relevant field/value
+metadata, and private-key blocks.
 
 FMC authentication follows [Cisco's token protocol](https://www.cisco.com/c/en/us/td/docs/security/firepower/10-0/API/REST/firepower_management_center_rest_api_quick_start_guide_10_0/Connecting_With_A_Client.pdf).
 Tokens live in process memory, refresh proactively, and are regenerated after

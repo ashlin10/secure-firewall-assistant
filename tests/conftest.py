@@ -81,7 +81,7 @@ class Lab:
 
 @pytest.fixture
 def state(tmp_path):
-    value = State(tmp_path / "private-config", tmp_path / "private-data")
+    value = State(tmp_path / "private-config", tmp_path / "private-data", tmp_path / "devices.yaml")
     value.save_device(Device("lab-fmc-1", "fmc", "https://fmc.example.invalid", "fixture-user", "lab-fmc-1-auth", domain="Global"))
     return value
 
@@ -93,8 +93,7 @@ def lab():
 
 @pytest.fixture
 def assistant(state, lab):
-    store = SecretStore(Redactor())
-    store._backend = MemoryBackend()
+    store = SecretStore(Redactor(), state.device_file)
     store.set("lab-fmc-1-auth", "SYNTHETIC-LOGIN-SENTINEL")
 
     def factory(device, secrets, redactor):

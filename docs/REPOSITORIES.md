@@ -6,8 +6,9 @@ Maintain the same reviewed source and version tags in these private repositories
 - GitHub: https://github.com/ashlin10/secure-firewall-assistant
 
 Use the Cisco repository as `origin` and the GitHub copy as `github`. Both are
-source destinations; private device inventories, native credential entries,
-evidence, virtual environments, and dependency caches never belong in either.
+source destinations; local device inventory, `devices.yaml`, evidence, virtual
+environments, and dependency caches never belong in either. Only
+`devices.example.yaml` is a tracked template.
 
 ```sh
 git remote add origin git@wwwin-github.cisco.com:aleroyds/secure-firewall-assistant.git

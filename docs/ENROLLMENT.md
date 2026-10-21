@@ -2,19 +2,16 @@
 
 ## Enroll inside ChatGPT or Codex
 
-Ask: “Enroll FMC lab-fmc-1 at https://my-fmc using username api-user.”
-`start_enrollment` returns an **embedded MCP App card inside the conversation**,
-not a browser URL. Enter and repeat the password in that card, then select **Save enrollment**.
-The card has no domain or CA-file controls. It confirms the saved enrollment
+Ask: “Enroll a device.” `start_enrollment` returns an **embedded MCP App card
+inside the conversation**, not a browser URL. Enter the alias, address, username,
+and password in the card, then select **Save enrollment**. An existing alias can
+be re-enrolled when its type, address, and username match; the form preserves its
+other saved details. Different details require a new alias. The card confirms the saved enrollment
 through a status read and checks FMC connectivity separately. If a save response
-times out, select **Check enrollment status** before retrying. Complete any native
-Keychain/Credential Manager prompt on your computer.
-The password goes directly from the card to a short-lived loopback endpoint and
-then to Keychain/Credential Manager. Return to chat if the connection check needs follow-up. Existing aliases cannot be overwritten through the form.
+times out, select **Check enrollment status** before retrying.
 
 You can also open **Secure Firewall enrollment** through the plugin's app
-entrypoint, enter the FMC name/address/username, select **Continue**, then save
-the credential. This uses ChatGPT's plugin UI, without a browser window.
+entrypoint and complete the device details and password in the same card.
 
 Security boundaries:
 
@@ -31,20 +28,25 @@ Security boundaries:
 - Local-network/browser sandbox permission may be required. If the host cannot
   render MCP Apps or cannot reach loopback, show an error; never silently open a
   browser, request a password in chat, or route it through tool arguments.
+- The card checks loopback connectivity before revealing the password fields.
+  If the host blocks the cross-origin iframe's loopback request, the card reports
+  that no password was sent. The embedding host must delegate loopback access;
+  plugin code cannot grant that host-level permission.
 - The helper uses local HTTP for the loopback channel. FMC HTTPS validation
-  remains enabled. Native store/host/network observability still follows your
-  OS and workspace controls; this does not claim protection from local malware.
+  remains enabled. Credentials and device details are saved in clear text in
+  `devices.yaml` in the plugin's local folder. On Unix systems, the file is
+  written with owner-only permissions. Keep it out of Git repositories, backups,
+  and synced folders. It remains accessible to processes and people with access
+  to your account or computer.
 
 Verified protocol support and JavaScript component tests do not establish that every
 ChatGPT/Codex rollout permits inline UI to reach a local listener. Test the card
-in a fresh local chat after updating the plugin. The terminal alternative below
-remains available only when deliberately chosen by the user.
+in a fresh local chat after updating the plugin.
 
 ## Terminal alternative
 
-Run these commands yourself in your terminal, from the installed release
-directory printed by setup. Replace example addresses with your own values.
-They are illustrative documentation addresses, not enrolled devices.
+The terminal option is retained for device types or options not present in the
+card. It writes credentials to the same local YAML file.
 
 macOS:
 
@@ -62,11 +64,6 @@ Windows PowerShell:
 
 Password entry is hidden and repeated once to catch typos. There is no password
 argument or environment-variable option. Interactive enrollment is required.
-The helper chooses macOS Keychain or Windows Credential Manager explicitly and
-refuses plaintext fallback backends. Initial OS access prompts or an unlocked
-credential store may be necessary. Credential access is under your local user
-account; it is not an isolated hardware vault inaccessible to other approved
-processes running as that user.
 
 For a lab/private CA, add `--ca-bundle /absolute/path/lab-ca.pem` on macOS, or
 `--ca-bundle 'C:\Users\you\Certificates\lab-ca.pem'` on Windows. Certificates
@@ -107,15 +104,24 @@ For an API configuration field that needs a secret, enroll it locally:
 In the requested payload, use `{"$secret":"radius-lab-secret"}` in that field.
 The helper resolves it internally before validation and transmission. Literal
 nonempty sensitive-field values are rejected. Do not use password-like values
-in names/descriptions; native stores, redaction, and metadata detection cannot
+in names/descriptions; file storage, redaction, and metadata detection cannot
 infer the sensitivity of arbitrary unlabeled text.
 
-Inventory and evidence paths are shown by `health`. macOS uses the per-user
-Application Support directory; Windows uses platform-specific per-user app
-directories. Unix private directories/files use restrictive modes; Windows
-inherits the user profile's ACLs. Do not relocate private data into shared or
-synced source folders. `SFA_DATA_DIR` is an optional local path override for
-isolated tests/approved deployments; it is never provided as an MCP argument.
+The installer keeps `devices.yaml` beside versioned releases so upgrades reuse
+it. `devices.example.yaml` is the tracked credential-free format example. The
+local file is ignored by Git and excluded from release archives. Unix writes use
+mode `0600`; on Windows, permissions inherit the plugin folder's ACLs, so keep
+that folder restricted to your user. Inventory and evidence remain in the
+per-user app data directories. `SFA_DATA_DIR` is an optional local path override
+for isolated tests/approved deployments; it is never provided as an MCP argument.
+The card writes the device record under `devices` and its password under
+`credentials`, keyed by `credential_ref`. You can add a device by copying the
+sample structure into the local file, with matching alias and credential
+reference. Quote passwords that contain YAML punctuation; the card handles
+quoting automatically.
+Existing Keychain/Credential Manager entries are not migrated or used by this
+version. Re-enroll each existing alias through the card; the old OS entries can
+be removed separately after confirming the YAML-backed connection works.
 
 Browser sign-in is separate. The plugin never reads a stored password into chat
 or types it through a model-visible browser tool. Reuse an approved browser

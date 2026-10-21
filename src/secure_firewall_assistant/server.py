@@ -25,7 +25,7 @@ runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.3.2", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.3.4", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -68,7 +68,7 @@ def build_server(assistant: Assistant | None = None):
                                annotations=write_annotation if write else read_annotation, meta=meta)(wrapped)
         return decorate
 
-    @expose("assistant_health", "Inspect local package/schema status without reading credentials or contacting devices.")
+    @expose("assistant_health", "Inspect local package/schema status without revealing credentials or contacting devices.")
     def health() -> dict:
         return assistant.health()
 
@@ -76,13 +76,15 @@ def build_server(assistant: Assistant | None = None):
     def devices() -> dict:
         return {"devices": assistant.state.aliases()}
 
-    @expose("start_enrollment", "Show a private enrollment form inside ChatGPT. Device details only; never pass a password. With no details, show the device form. Do not open a browser.", write=True,
+    @expose("start_enrollment", "Show an embedded ChatGPT form to enter or confirm device details, then save the password to local YAML. Never pass a password in tool arguments. Do not open a browser.", write=True,
             meta={"ui": {"resourceUri": enrollment.uri}, "openai/outputTemplate": enrollment.uri,
                   "openai/ui": {"entrypoints": [{"type": "global"}, {"type": "thread"}]}})
     def enroll(kind: Literal["fmc", "ftd"] = "fmc", alias: str = "", address: str = "", username: str = "",
-               domain: str | None = None) -> dict:
-        if not alias and not address and not username:
-            return {"status": "enter_device_details", "next_step": "Use the embedded enrollment form; do not open a browser."}
+               domain: str | None = None, confirm_details: bool = False) -> dict:
+        if not confirm_details:
+            return {"status": "enter_device_details", "prefill": {"kind": kind, "alias": alias,
+                    "address": address, "username": username},
+                    "next_step": "Complete or confirm the device details in the embedded form."}
         return enrollment.start(kind, alias, address, username, domain)
 
     @expose("enrollment_status", "Read enrollment status only; never returns credential values or form contents.")

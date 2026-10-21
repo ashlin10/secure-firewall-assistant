@@ -13,7 +13,7 @@ is not a cloud MCP deployment or a public-directory submission.
   Use an approved installer/package manager; do not bypass your device policy.
 - Internet for the initial Python/dependency installation, and local network
   access to your enrolled lab devices for actual operations.
-- Native credential-store access. No cloud vault account or OpenAI API key.
+- A writable local plugin folder for `devices.yaml`. No cloud vault account or OpenAI API key.
 
 ## Install
 
@@ -57,7 +57,8 @@ silently claim the assistant skill is installed through MCP registration alone.
 Download and inspect a reviewed versioned release; run its installer; then
 refresh/reinstall from the marketplace and start a new chat. The installer
 retains earlier release directories so running processes and rollback remain
-available. It does not overwrite native credential entries or private inventory.
+available. It leaves the shared `devices.yaml` beside the release directories
+untouched.
 
 To select a previous successfully installed release:
 
@@ -80,9 +81,9 @@ installer is active.
 
 Uninstall through ChatGPT's Plugins interface. Remove only this plugin's personal
 marketplace entry and release directories if you want to remove local software.
-Private inventory/evidence and native credential-store entries are intentionally
-retained; delete them explicitly using OS tools if desired. Never remove another
-plugin's entry or reset the entire marketplace file.
+Private inventory/evidence and `devices.yaml` are intentionally retained; delete
+them explicitly if desired. Never remove another plugin's entry or reset the
+entire marketplace file.
 
 This source-based installer is not a signed/notarized native application. A
 managed organization may require approved packaging or signing before rollout.
