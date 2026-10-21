@@ -25,7 +25,7 @@ runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.3.6", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.3.7", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)

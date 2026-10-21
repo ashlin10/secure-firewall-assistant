@@ -36,7 +36,7 @@ class Assistant:
             client.close()
 
     def health(self) -> dict:
-        return {"version": "0.3.6", "devices_enrolled": len(self.state.aliases()),
+        return {"version": "0.3.7", "devices_enrolled": len(self.state.aliases()),
                 "schema": self.catalog.provenance, "network_access_tested": False,
                 "credential_file": str(self.secrets.path),
                 "runtime_writes": "deployment tool only; special operational APIs disabled",
@@ -46,7 +46,8 @@ class Assistant:
         client = self.client(target)
         version = client.version(refresh=True)
         return {"target": target, "domain": client.domain_name, "domain_uuid": client.domain,
-                "server_version": version, "compatibility": client.compatibility()}
+                "server_version": version, "compatibility": client.compatibility(),
+                "tls_verification": bool(client.device.verify_ssl or client.device.ca_bundle)}
 
     def _call(self, target: str, op_id: str, path: dict | None = None, query: dict | None = None,
               headers: dict | None = None, body=None) -> dict:

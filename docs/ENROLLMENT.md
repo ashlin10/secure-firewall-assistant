@@ -63,9 +63,16 @@ Windows PowerShell:
 Password entry is hidden and repeated once to catch typos. There is no password
 argument or environment-variable option. Interactive enrollment is required.
 
-For a lab/private CA, add `--ca-bundle /absolute/path/lab-ca.pem` on macOS, or
-`--ca-bundle 'C:\Users\you\Certificates\lab-ca.pem'` on Windows. Certificates
-are always verified, including hostnames. There is no insecure TLS switch.
+Lab HTTPS accepts self-signed certificates by default, including when connecting
+by IP with a hostname mismatch. To enable certificate and hostname verification,
+set `verify_ssl: true` in local device metadata or enroll with `--verify-ssl`.
+The inventory form preserves this advanced setting on save.
+
+For a lab/private CA with verification enabled, add
+`--ca-bundle /absolute/path/lab-ca.pem` on macOS, or
+`--ca-bundle 'C:\Users\you\Certificates\lab-ca.pem'` on Windows. Providing a CA
+bundle enables certificate and hostname verification even when
+`verify_ssl` is false.
 Add `--expected-version-prefix 10.5.` if you want writes blocked on any other
 observed version. This is a version constraint, not proof of schema coverage.
 

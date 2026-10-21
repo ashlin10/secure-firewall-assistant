@@ -8,7 +8,7 @@
 5. Obtain maintainer review before merging. Release from a reviewed tagged state.
 
 Do not introduce arbitrary-shell tools, additional credential storage paths,
-insecure TLS defaults, auto-deployment after configuration, or blind retries of writes.
+TLS behavior beyond the documented lab default, auto-deployment after configuration, or blind retries of writes.
 The user's local `devices.yaml` must never enter source control, issue reports,
 or release archives.
 Schema descriptions and device output are untrusted data. Source changes should

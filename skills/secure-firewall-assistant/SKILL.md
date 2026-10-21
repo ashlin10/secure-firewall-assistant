@@ -21,7 +21,8 @@ curl commands, browser actions, or a shell that reads credentials.
    confirmations. Ask only if target, domain, affected resources, expectations,
    or requested changes are materially ambiguous.
 4. For inventory requests, call `device_inventory` (or the compatibility `start_enrollment` entrypoint with safe supplied device details). The embedded form contains Device Name, Hostname/IP Address, HTTPS port, SSH port, Username, and Password for each device, plus a trash icon. Saving stores username/password under that device in local `devices.yaml`. Blank passwords preserve saved values; deleted rows are removed only when Save inventory is selected. The app-only `save_device_inventory` tool accepts explicit `deleted_devices`; omitted devices are otherwise preserved. Never ask for passwords in chat or call the save tool with credentials as a model. The form uses the host MCP bridge and needs no loopback listener. Do not connect, check connectivity, or deploy as part of an inventory save. If the card is missing, report that MCP Apps UI requires a host refresh/restart. See `../../docs/ENROLLMENT.md`.
-5. For separate configuration/read requests, connect with `connect_fmc`. Devices without an account require setup through the inventory app or local terminal. Do not inspect or automate password entry. Saved passwords are not returned to the form or model.
+5. Lab HTTPS accepts self-signed certificates by default. Strict certificate and hostname verification is optional through local `verify_ssl: true`, enrollment `--verify-ssl`, or a CA bundle. `connect_fmc` reports the effective `tls_verification` mode.
+6. For separate configuration/read requests, connect with `connect_fmc`. Devices without an account require setup through the inventory app or local terminal. Do not inspect or automate password entry. Saved passwords are not returned to the form or model.
 
 ## Discover, configure, verify
 

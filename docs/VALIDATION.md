@@ -1,5 +1,12 @@
 # Validation report — 21 October 2026
 
+## 0.3.7 optional lab TLS verification
+
+- 98 automated tests passed; Ruff and plugin/source package validation passed.
+- A real local HTTPS fixture confirmed default acceptance of a self-signed certificate with a mismatched hostname, strict rejection of an untrusted issuer, CA-bundle rejection of a hostname mismatch, and successful verification with a matching hostname and trusted certificate.
+- Inventory saves preserve strict TLS settings; invalid verification settings and CA bundles fail before connection.
+- Automated checks do not establish live FMC API compatibility or desktop-session reload behavior.
+
 ## 0.3.6 inventory accounts and deletion
 
 - Local suite: 95 tests passed, including stdio discovery, password migration and rotation, blank-password preservation, deletion of legacy entries, empty inventories, and restoration after a failed YAML write.

@@ -1,4 +1,6 @@
-# Secure Firewall Assistant 0.3.6
+# Secure Firewall Assistant 0.3.7
+
+Lab HTTPS connections accept self-signed certificates by default. Set `verify_ssl: true` in a device’s local YAML metadata, enroll with `--verify-ssl`, or supply `--ca-bundle` to enable certificate and hostname verification. HTTPS remains encrypted; the default does not authenticate the server certificate.
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and

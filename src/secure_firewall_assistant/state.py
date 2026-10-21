@@ -57,8 +57,11 @@ class Device:
     port: int = 22
     fmc_alias: str | None = None
     device_uuid: str | None = None
+    verify_ssl: bool = False
 
     def __post_init__(self):
+        if type(self.verify_ssl) is not bool:
+            raise AssistantError("invalid_device", "verify_ssl must be true or false.")
         if not ALIAS.fullmatch(self.alias) or self.kind not in ("fmc", "ftd"):
             raise AssistantError("invalid_device", "Supply a valid device alias and kind (fmc or ftd).")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", self.credential_ref):

@@ -51,12 +51,16 @@ def test_invalid_inventory_never_writes(assistant, devices):
 
 
 def test_existing_device_settings_are_preserved(assistant):
+    from dataclasses import replace
+
+    assistant.state.save_device(replace(assistant.state.device("lab-fmc-1"), verify_ssl=True))
     device = assistant.state.inventory()['devices']['lab-fmc-1']
     ui = EnrollmentUI(assistant.state, assistant.secrets)
     ui.save([row('lab-fmc-1', 'changed.example.invalid', 8443, 2222)])
     updated = assistant.state.device('lab-fmc-1')
     assert updated.username == device['username']
     assert updated.domain == device['domain']
+    assert updated.verify_ssl is True
     assert updated.credential_ref == device['credential_ref']
     assert updated.address == 'https://changed.example.invalid:8443'
     assert updated.port == 2222

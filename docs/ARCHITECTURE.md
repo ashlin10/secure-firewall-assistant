@@ -66,8 +66,12 @@ the documented refresh allowance. Read requests may retry bounded transient
 failures. Writes are not automatically replayed after errors or uncertain results.
 Device roles remain the ultimate authorization boundary.
 
-HTTPS certificate and hostname verification are mandatory, with optional enrolled
-CA bundles. Proxy environment variables are not inherited by the FMC HTTP client.
+Lab HTTPS connections disable certificate and hostname verification by default,
+including for existing devices without a `verify_ssl` setting. Set `verify_ssl: true`
+in local device metadata or enroll with `--verify-ssl` to use default CA trust. An
+enrolled CA bundle also enables certificate and hostname verification. HTTPS
+remains encrypted, but the lab default does not authenticate the server certificate.
+Proxy environment variables are not inherited by the FMC HTTP client.
 Only inventory origins and catalog paths are used; redirects and remote pagination
 links are not followed. OpenAPI references cannot retrieve remote URLs/files.
 

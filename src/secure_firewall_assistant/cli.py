@@ -31,7 +31,8 @@ def parser():
     enroll.add_argument("address", help="FMC HTTPS origin or FTD hostname/IP")
     enroll.add_argument("--username", required=True)
     enroll.add_argument("--domain", help="Exact FMC domain name or UUID; required if several domains are available")
-    enroll.add_argument("--ca-bundle", type=Path, help="PEM trust bundle; certificate verification is always enabled")
+    enroll.add_argument("--ca-bundle", type=Path, help="PEM trust bundle; enables certificate and hostname verification")
+    enroll.add_argument("--verify-ssl", action="store_true", help="Verify certificate and hostname (disabled by default for labs)")
     enroll.add_argument("--expected-version-prefix", help="Block writes when the observed version does not start with this prefix")
     enroll.add_argument("--port", type=int, default=22)
     enroll.add_argument("--fmc-alias")
@@ -64,7 +65,7 @@ def main():
                 raise AssistantError("ca_bundle_missing", "Certificate trust bundle was not found.")
             device = Device(alias=args.alias, kind=args.kind, address=args.address.rstrip("/"),
                             username=args.username, credential_ref=args.alias + "-auth", domain=args.domain,
-                            ca_bundle=ca, expected_version_prefix=args.expected_version_prefix, port=args.port,
+                            ca_bundle=ca, verify_ssl=args.verify_ssl, expected_version_prefix=args.expected_version_prefix, port=args.port,
                             fmc_alias=args.fmc_alias, device_uuid=args.device_uuid)
             # Serialize enrollment against active operations and other setup processes.
             with state.target_lock(args.alias):

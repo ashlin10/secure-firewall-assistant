@@ -15,7 +15,7 @@ class FMC:
                  transport: httpx.BaseTransport | None = None):
         self.device, self.secrets, self.redactor = device, secrets, redactor
         try:
-            verify = ssl.create_default_context(cafile=device.ca_bundle) if device.ca_bundle else True
+            verify = ssl.create_default_context(cafile=device.ca_bundle) if device.ca_bundle else device.verify_ssl
         except (OSError, ssl.SSLError):
             raise AssistantError("ca_bundle_invalid", "The enrolled certificate trust bundle cannot be loaded.") from None
         self.http = httpx.Client(base_url=device.address.rstrip("/"), verify=verify, timeout=30,

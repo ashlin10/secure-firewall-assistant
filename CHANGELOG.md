@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.7
+
+- Accept self-signed HTTPS certificates and hostname mismatches by default for lab FMCs, including existing inventory.
+- Retain strict certificate verification through per-device `verify_ssl`, `--verify-ssl`, or an enrolled CA bundle.
+- Report the effective TLS verification mode on connection and test real self-signed TLS connections.
+
 ## 0.3.6
 
 - Add per-device username and password fields to the inventory form and store clear text passwords under each device in local YAML.

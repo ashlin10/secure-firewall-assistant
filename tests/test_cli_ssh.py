@@ -81,3 +81,9 @@ def test_evidence_pointer_and_secret_echo_redaction(assistant):
     assert "SYNTHETIC" not in (assistant.evidence.directory / (saved["run_id"] + ".json")).read_text()
     with pytest.raises(AssistantError):
         assistant.evidence.read(saved["run_id"], pointer="/missing")
+
+
+def test_cli_tls_verification_is_optional():
+    args = ["enroll", "fmc", "alias", "https://fmc.example.invalid", "--username", "user"]
+    assert cli.parser().parse_args(args).verify_ssl is False
+    assert cli.parser().parse_args(args + ["--verify-ssl"]).verify_ssl is True
