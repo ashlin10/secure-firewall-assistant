@@ -1,192 +1,101 @@
-"""Embedded MCP App with a direct, short-lived loopback credential channel.
-
-Passwords are never MCP arguments, results, widget state, or bridge messages.
-The UI must run in the documented ChatGPT sandbox origin; other origins fail closed.
-"""
+"""Device inventory MCP App. Uses the host bridge; no network listener or credentials."""
+import ipaddress
 import json
-import secrets
-import threading
-import time
-import uuid
-from dataclasses import replace
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import re
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from filelock import FileLock
 from mcp.types import CallToolResult, TextContent
 
 from .errors import AssistantError
-from .state import Device
+from .state import ALIAS
 
-SANDBOX_ORIGIN = "https://web-sandbox.oaiusercontent.com"
 MIME = "text/html;profile=mcp-app"
 
 
+def validate_row(row):
+    if not isinstance(row, dict) or set(row) != {"device_name", "hostname", "https_port", "ssh_port"}:
+        raise AssistantError("invalid_inventory", "Each device requires Device Name, Hostname/IP Address, HTTPS port, and SSH port.")
+    name, host = row["device_name"], row["hostname"]
+    if not isinstance(name, str) or not ALIAS.fullmatch(name):
+        raise AssistantError("invalid_inventory", "Device names must use 1–64 letters, digits, dots, underscores, or hyphens, starting with a letter or digit.")
+    if not isinstance(host, str) or not host or len(host) > 253:
+        raise AssistantError("invalid_inventory", "Enter a hostname or IP address without a URL scheme, path, or port.")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        if not all(re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", part)
+                   for part in host.rstrip(".").split(".")):
+            raise AssistantError("invalid_inventory", "Enter a valid hostname or IP address without a URL scheme, path, or port.") from None
+    if any(type(row[key]) is not int or not 1 <= row[key] <= 65535 for key in ("https_port", "ssh_port")):
+        raise AssistantError("invalid_inventory", "HTTPS and SSH ports must be whole numbers from 1 to 65535.")
+    return dict(row)
+
+
 class EnrollmentUI:
+    """Compatibility class name for the former enrollment resource."""
+
     def __init__(self, state, store):
         self.state, self.store = state, store
-        self.sessions = {}
-        self.lock = threading.RLock()
-        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.http.daemon_threads = True
-        self.http.owner = self
-        self.http.handle_error = lambda *_: None
-        self.origin = f"http://127.0.0.1:{self.http.server_port}"
-        # Each MCP process gets its own resource/cache key and exact CSP origin.
-        self.uri = f"ui://secure-firewall/enrollment/v3/{uuid.uuid4().hex}.html"
-        self.worker = threading.Thread(target=self.http.serve_forever, daemon=True)
-        self.worker.start()
+        self.uri = "ui://secure-firewall/device-inventory/v1.html"
 
     def close(self):
-        self.http.shutdown()
-        self.http.server_close()
+        pass
 
     @property
     def resource_meta(self):
-        return {"ui": {"prefersBorder": True, "csp": {"connectDomains": [self.origin], "resourceDomains": []}},
-                "openai/widgetDescription": "Private device enrollment form. The user enters credentials here; never inspect or automate its password inputs.",
-                "openai/widgetCSP": {"connect_domains": [self.origin], "resource_domains": []}}
+        return {"ui": {"prefersBorder": True, "csp": {"connectDomains": [], "resourceDomains": []}},
+                "openai/widgetDescription": "Edit device names, hostnames/IP addresses, HTTPS ports, and SSH ports in the local device inventory YAML.",
+                "openai/widgetCSP": {"connect_domains": [], "resource_domains": []}}
 
-    def start(self, kind, alias, address, username, domain=None):
-        device = Device(kind=kind, alias=alias, address=address.rstrip("/"), username=username,
-                        credential_ref=alias + "-auth", domain=domain)
-        existing_fields = self.state.inventory()["devices"].get(alias)
-        if existing_fields:
-            existing = Device(**existing_fields)
-            if (existing.kind != device.kind or existing.address != device.address or
-                    existing.username != device.username):
-                raise AssistantError("alias_exists", "This alias already has different device details; no credential was changed.")
-            device = replace(existing, domain=domain if domain is not None else existing.domain)
-        identifier, authorization = uuid.uuid4().hex, secrets.token_urlsafe(32)
-        with self.lock:
-            self.sessions = {key: value for key, value in self.sessions.items() if value["expires"] > time.time()}
-            if len(self.sessions) >= 16:
-                raise AssistantError("enrollment_limit", "Complete an existing enrollment or wait for it to expire.")
-            self.sessions[identifier] = {"device": device, "authorization": authorization,
-                                         "expires": time.time() + 600, "status": "waiting"}
-        public = {"enrollment_id": identifier, "alias": alias, "status": "waiting_for_private_form",
-                  "expires_in_seconds": 600,
-                  "next_step": "The user must fill the embedded enrollment card. Never open a browser or ask for a password in chat. If the card is absent, report that MCP Apps UI must be enabled/refreshed; do not fall back automatically."}
-        return CallToolResult(content=[TextContent(type="text", text=json.dumps(public))],
-                              structured_content=public,
-                              _meta={"enrollment": {"endpoint": self.origin + "/enroll/" + identifier,
-                                                    "authorization": authorization, "alias": alias,
-                                                    "address": device.address, "username": username, "kind": kind,
-                                                    "domain": domain or "", "expires": self.sessions[identifier]["expires"]}})
+    def rows(self):
+        rows = []
+        for name, device in self.state.inventory()["devices"].items():
+            origin = urlsplit(device["address"]) if device["kind"] == "fmc" else None
+            rows.append({"device_name": name, "hostname": origin.hostname if origin else device["address"],
+                         "https_port": (origin.port or 443) if origin else 443,
+                         "ssh_port": device.get("port", 22)})
+        # Preserve HTTPS metadata on FTD entries too.
+        local = self.store._read()["devices"]
+        for row in rows:
+            stored = local.get(row["device_name"], {})
+            row["https_port"] = stored.get("https_port", row["https_port"])
+        return rows
 
-    def status(self, identifier):
-        with self.lock:
-            job = self.sessions.get(identifier)
-            if job is None:
-                raise AssistantError("unknown_enrollment", "This form belongs to another or restarted helper. Start a fresh form.")
-            status = job["status"]
-            if status == "waiting" and job["expires"] <= time.time():
-                status = "expired"
-            return {"enrollment_id": identifier, "alias": job["device"].alias, "status": status}
+    def start(self, alias="", address=""):
+        rows = self.rows()
+        if alias and not any(row["device_name"] == alias for row in rows):
+            origin = urlsplit(address) if "://" in address else None
+            rows.append({"device_name": alias, "hostname": (origin.hostname or "") if origin else address,
+                         "https_port": (origin.port or 443) if origin else 443, "ssh_port": 22})
+        public = {"status": "edit_device_inventory", "devices": rows,
+                  "next_step": "Edit the device inventory form and select Save inventory. This only updates devices.yaml."}
+        return CallToolResult(content=[TextContent(type="text", text=json.dumps(public))], structured_content=public)
+
+    def save(self, devices):
+        if not isinstance(devices, list) or not 1 <= len(devices) <= 1000:
+            raise AssistantError("invalid_inventory", "Submit between 1 and 1000 devices.")
+        rows = [validate_row(row) for row in devices]
+        if len({row["device_name"] for row in rows}) != len(rows):
+            raise AssistantError("invalid_inventory", "Device names must be unique.")
+        # Validate every row before writing, and share the credential writer's lock.
+        with FileLock(str(self.store.path) + ".lock", timeout=15):
+            stored = self.store._read()
+            existing = self.state.inventory()["devices"]
+            for row in rows:
+                name = row["device_name"]
+                record = stored["devices"].get(name, existing.get(name, {})).copy()
+                record.update(row)
+                if "address" in record:
+                    host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]
+                    record["address"] = (f'https://{host}:{row["https_port"]}'
+                                         if record.get("kind") == "fmc" else row["hostname"])
+                    record["port"] = row["ssh_port"]
+                stored["devices"][name] = record
+            self.store._write(stored)
+        return {"ok": True, "status": "inventory_saved", "devices": rows,
+                "message": "Device inventory saved to devices.yaml."}
 
     def html(self):
         return Path(__file__).with_name("enrollment_card.html").read_text(encoding="utf-8")
-
-
-class Handler(BaseHTTPRequestHandler):
-    def setup(self):
-        super().setup()
-        self.connection.settimeout(10)
-
-    def log_message(self, *_):
-        pass
-
-    def reply(self, code, value):
-        body = json.dumps(value).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Vary", "Origin")
-        if self.headers.get("Origin") == SANDBOX_ORIGIN:
-            self.send_header("Access-Control-Allow-Origin", SANDBOX_ORIGIN)
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SFA-Enrollment")
-            self.send_header("Access-Control-Allow-Private-Network", "true")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def job(self):
-        owner = self.server.owner
-        if (self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}" or
-                self.headers.get("Origin") != SANDBOX_ORIGIN or
-                not self.path.startswith("/enroll/")):
-            return None
-        path = self.path.removeprefix("/enroll/")
-        identifier = path.removesuffix("/probe") if path.endswith("/probe") else path
-        with owner.lock:
-            job = owner.sessions.get(identifier)
-            if job and job["status"] == "waiting" and job["expires"] > time.time():
-                return job
-        return None
-
-    def do_GET(self):
-        # A password-free probe lets the user confirm iframe-to-loopback access
-        # before entering a credential. The token is session-scoped and never
-        # returned to the model or written to logs.
-        job = self.job()
-        if (job is None or not self.path.endswith("/probe") or
-                not secrets.compare_digest(self.headers.get("X-SFA-Enrollment", ""), job["authorization"])):
-            return self.reply(403, {"ok": False, "message": "Enrollment connection unavailable or request rejected."})
-        return self.reply(200, {"ok": True})
-
-    def do_OPTIONS(self):
-        if (not self.job() or self.headers.get("Access-Control-Request-Method") not in {"GET", "POST"} or
-                set(h.strip().lower() for h in self.headers.get("Access-Control-Request-Headers", "").split(",")) -
-                {"content-type", "x-sfa-enrollment"}):
-            return self.reply(403, {"ok": False})
-        return self.reply(200, {"ok": True})
-
-    def do_POST(self):
-        # Consume bounded request bodies before rejecting authorization. Closing a
-        # Windows socket with unread data can reset it and hide the JSON error.
-        try:
-            size = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            return self.reply(400, {"ok": False, "message": "Invalid form submission."})
-        if not 0 < size <= 32768 or self.headers.get("Transfer-Encoding"):
-            return self.reply(413, {"ok": False})
-        raw = self.rfile.read(size)
-        job = self.job()
-        if (job is None or not secrets.compare_digest(self.headers.get("X-SFA-Enrollment", ""), job["authorization"]) or
-                self.headers.get("Content-Type", "").split(";")[0] != "application/json" or
-                self.headers.get("Transfer-Encoding")):
-            return self.reply(403, {"ok": False, "message": "Enrollment unavailable or request rejected."})
-        try:
-            fields = json.loads(raw)
-            if (not isinstance(fields, dict) or set(fields) != {"password", "repeat"} or
-                    any(not isinstance(v, str) for v in fields.values())):
-                return self.reply(400, {"ok": False, "message": "Invalid form fields."})
-            if not fields["password"] or fields["password"] != fields["repeat"]:
-                return self.reply(400, {"ok": False, "message": "Passwords must be nonempty and match."})
-            device = job["device"]
-            owner = self.server.owner
-            with owner.lock:
-                if job["status"] != "waiting" or job["expires"] <= time.time():
-                    return self.reply(409, {"ok": False, "message": "Start a fresh enrollment form."})
-                job["status"] = "saving"
-            try:
-                # Native-store prompts can block. Status reads must remain available.
-                with owner.state.target_lock(device.alias):
-                    existing_fields = owner.state.inventory()["devices"].get(device.alias)
-                    if existing_fields and Device(**existing_fields) != device:
-                        return self.reply(409, {"ok": False, "message": "This alias now has different device details."})
-                    owner.store.set(device.credential_ref, fields["password"], device=device)
-                    owner.state.save_device(device)
-                with owner.lock:
-                    job["status"] = "enrolled"
-                    job["authorization"] = ""
-            finally:
-                with owner.lock:
-                    if job["status"] == "saving":
-                        job["status"] = "waiting"
-            return self.reply(200, {"ok": True, "alias": device.alias, "status": "enrolled"})
-        except (ValueError, UnicodeError):
-            return self.reply(400, {"ok": False, "message": "Invalid form submission."})
-        except Exception:
-            return self.reply(500, {"ok": False, "message": "Could not save enrollment to local devices.yaml. Check the file and folder permissions, then retry."})

@@ -25,7 +25,7 @@ runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.3.4", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.3.5", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -76,20 +76,21 @@ def build_server(assistant: Assistant | None = None):
     def devices() -> dict:
         return {"devices": assistant.state.aliases()}
 
-    @expose("start_enrollment", "Show an embedded ChatGPT form to enter or confirm device details, then save the password to local YAML. Never pass a password in tool arguments. Do not open a browser.", write=True,
-            meta={"ui": {"resourceUri": enrollment.uri}, "openai/outputTemplate": enrollment.uri,
-                  "openai/ui": {"entrypoints": [{"type": "global"}, {"type": "thread"}]}})
-    def enroll(kind: Literal["fmc", "ftd"] = "fmc", alias: str = "", address: str = "", username: str = "",
-               domain: str | None = None, confirm_details: bool = False) -> dict:
-        if not confirm_details:
-            return {"status": "enter_device_details", "prefill": {"kind": kind, "alias": alias,
-                    "address": address, "username": username},
-                    "next_step": "Complete or confirm the device details in the embedded form."}
-        return enrollment.start(kind, alias, address, username, domain)
+    inventory_meta = {"ui": {"resourceUri": enrollment.uri}, "openai/outputTemplate": enrollment.uri,
+                      "openai/ui": {"entrypoints": [{"type": "global"}, {"type": "thread"}]}}
 
-    @expose("enrollment_status", "Read enrollment status only; never returns credential values or form contents.")
-    def enrollment_status(enrollment_id: str) -> dict:
-        return enrollment.status(enrollment_id)
+    @expose("device_inventory", "Open the device inventory form. Save updates only local devices.yaml; no credentials or connection checks.", meta=inventory_meta)
+    def device_inventory() -> CallToolResult:
+        return enrollment.start()
+
+    @expose("start_enrollment", "Compatibility entrypoint for the device inventory form. Only local inventory metadata is saved.", meta=inventory_meta)
+    def enroll(kind: Literal["fmc", "ftd"] = "fmc", alias: str = "", address: str = "", username: str = "",
+               domain: str | None = None, confirm_details: bool = False) -> CallToolResult:
+        return enrollment.start(alias, address)
+
+    @expose("save_device_inventory", "Save device_name, hostname, https_port, and ssh_port to local devices.yaml. Preserves credentials and devices omitted from this update. Never contacts devices.", write=True)
+    def save_device_inventory(devices: list[dict]) -> dict:
+        return enrollment.save(devices)
 
     @expose("connect_fmc", "Authenticate internally and inspect the enrolled FMC domain and software version.")
     def connect(target: str) -> dict:

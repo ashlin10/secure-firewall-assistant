@@ -1,11 +1,9 @@
 format_version: 1
 devices:
   lab-fmc-1:
-    alias: lab-fmc-1
-    kind: fmc
-    address: https://fmc.example.invalid
-    username: api-user
-    credential_ref: lab-fmc-1-auth
-    domain: null
-credentials:
-  lab-fmc-1-auth: "replace-this-value-locally"
+    device_name: lab-fmc-1
+    hostname: fmc.example.invalid
+    https_port: 443
+    ssh_port: 22
+# Accounts are configured separately through local hidden terminal entry.
+credentials: {}

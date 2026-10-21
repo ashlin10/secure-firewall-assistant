@@ -20,7 +20,8 @@ curl commands, browser actions, or a shell that reads credentials.
    lookups, validation, writes, and read-back. Proceed without repetitive
    confirmations. Ask only if target, domain, affected resources, expectations,
    or requested changes are materially ambiguous.
-4. Connect with `connect_fmc`. For new devices call `start_enrollment` with any safe details already supplied; it returns the embedded MCP App form for the user to confirm or complete device details and enter the password. Never open a separate browser or return a loopback enrollment URL. Never inspect, screenshot, fill, or automate password inputs. Never ask for credentials in chat or tool arguments. Use `enrollment_status` after the user finishes, then connect. If the card is missing or its local connection is blocked, report the host/UI limitation and refresh/restart requirements. Do not fall back to a browser or terminal unless the user requests that alternative. See `../../docs/ENROLLMENT.md`.
+4. For inventory requests, call `device_inventory` (or the compatibility `start_enrollment` entrypoint with safe supplied device details). The embedded form contains Device Name, Hostname/IP Address, HTTPS port, and SSH port for each device. `save_device_inventory` only updates the local `devices.yaml`; it preserves stored credentials and other device settings. Do not check local connectivity, connect to FMC, collect credentials, or deploy as part of an inventory save. The form uses the host MCP bridge and needs no loopback listener. If the card is missing, report that MCP Apps UI requires a host refresh/restart. See `../../docs/ENROLLMENT.md`.
+5. For separate configuration/read requests, connect with `connect_fmc`. Inventory-only devices require local account setup before authentication. Never ask for passwords in chat or tool arguments; do not inspect or automate password entry.
 
 ## Discover, configure, verify
 

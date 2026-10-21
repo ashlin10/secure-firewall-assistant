@@ -36,7 +36,7 @@ class Assistant:
             client.close()
 
     def health(self) -> dict:
-        return {"version": "0.3.4", "devices_enrolled": len(self.state.aliases()),
+        return {"version": "0.3.5", "devices_enrolled": len(self.state.aliases()),
                 "schema": self.catalog.provenance, "network_access_tested": False,
                 "credential_file": str(self.secrets.path),
                 "runtime_writes": "deployment tool only; special operational APIs disabled",

@@ -1,5 +1,14 @@
 # Validation report — 19 October 2026
 
+## 0.3.5 device inventory update
+
+- 89 automated tests pass, including MCP inventory resource/tool round trips, multi-device YAML read-back, validation before writes, credential/settings preservation, and no device requests during inventory saves.
+- The Node component test verifies inventory load/edit/save, adding devices, error/retry behavior, and absence of automatic connection calls.
+- The app has no password fields, network fetches, loopback listener, or connection check. It uses only the host MCP bridge.
+- On 21 October 2026, found that the standalone MCP registration still pointed to 0.3.4 despite the 0.3.5 plugin skill being installed. Installed the current source, refreshed the plugin, and repinned the standalone server. A real stdio client verified the inventory tools, inventory-only resource, and compatibility entrypoint without modifying inventory or contacting devices.
+- Actual embedded rendering in the desktop host and Windows execution still require environment verification.
+
+
 ## 0.3.2 enrollment feedback and CI correction
 
 - 86 tests pass locally, including save confirmation, separate FMC connection results, lost/blocked response handling, bounded fetch timeout, native-store failure/retry, and responsive status during a synthetic native-store prompt.

@@ -61,7 +61,7 @@ class Device:
     def __post_init__(self):
         if not ALIAS.fullmatch(self.alias) or self.kind not in ("fmc", "ftd"):
             raise AssistantError("invalid_device", "Supply a valid device alias and kind (fmc or ftd).")
-        if not self.username or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", self.credential_ref):
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", self.credential_ref):
             raise AssistantError("invalid_device", "Username and a valid credential reference are required.")
         if self.kind == "fmc":
             u = urlsplit(self.address)
@@ -102,7 +102,23 @@ class State:
                         not isinstance(local.get("devices", {}), dict)):
                     raise ValueError
                 for name, fields in local.get("devices", {}).items():
-                    device = Device(**fields)
+                    if "device_name" in fields:
+                        from .enrollment_ui import validate_row
+                        row = validate_row({key: fields[key] for key in
+                                            ("device_name", "hostname", "https_port", "ssh_port")})
+                        if row["device_name"] != name:
+                            raise ValueError
+                        runtime = {key: value for key, value in fields.items()
+                                   if key not in ("device_name", "hostname", "https_port", "ssh_port")}
+                        host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]
+                        kind = runtime.get("kind", "fmc")
+                        runtime.update(alias=name, kind=kind, port=row["ssh_port"],
+                                       address=f'https://{host}:{row["https_port"]}' if kind == "fmc" else row["hostname"])
+                        runtime.setdefault("username", "")
+                        runtime.setdefault("credential_ref", name + "-auth")
+                        device = Device(**runtime)
+                    else:
+                        device = Device(**fields)
                     if name != device.alias:
                         raise ValueError
                     # Only validated metadata enters the in-memory inventory;
@@ -127,6 +143,8 @@ class State:
         device = Device(**obj[alias])
         if kind and device.kind != kind:
             raise AssistantError("wrong_target_kind", f"This tool requires an enrolled {kind.upper()}.")
+        if not device.username:
+            raise AssistantError("credential_missing", "This inventory device has no local account configured. Configure credentials locally before connecting.")
         return device
 
     def aliases(self) -> list[dict]:

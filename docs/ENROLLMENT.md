@@ -1,52 +1,42 @@
-# Private enrollment
+# Device inventory
 
-## Enroll inside ChatGPT or Codex
+## Edit inside ChatGPT or Codex
 
-Ask: “Enroll a device.” `start_enrollment` returns an **embedded MCP App card
-inside the conversation**, not a browser URL. Enter the alias, address, username,
-and password in the card, then select **Save enrollment**. An existing alias can
-be re-enrolled when its type, address, and username match; the form preserves its
-other saved details. Different details require a new alias. The card confirms the saved enrollment
-through a status read and checks FMC connectivity separately. If a save response
-times out, select **Check enrollment status** before retrying.
+Ask “Open device inventory” or use the plugin app entrypoint. The embedded form
+lists existing devices and lets you add rows. Each device has exactly four fields:
 
-You can also open **Secure Firewall enrollment** through the plugin's app
-entrypoint and complete the device details and password in the same card.
+- Device Name
+- Hostname/IP Address (without a scheme, path, or port)
+- HTTPS port (default 443)
+- SSH port (default 22)
 
-Security boundaries:
+Select **Save inventory** to update the local `devices.yaml`. Ports must be whole
+numbers from 1 through 65535; device names must be unique. Existing names update
+that device; a new name adds a device. Devices omitted from an update remain in
+the file. Renaming a row adds a new name and does not delete the old entry.
 
-- Password fields are never sent through MCP tools, chat messages, model-context
-  updates, widget state, console logs, or server request logs.
-- Safe device details and completion status can reach the model. A per-session
-  authorization value and loopback endpoint are delivered as widget-only `_meta`.
-- The listener binds only to 127.0.0.1. Each session expires after ten minutes,
-  checks an unguessable authorization header and exact Host/Origin, and becomes
-  unusable after a successful save. No GET/browser enrollment page is served.
-- The UI resource permits connections only to that helper's exact loopback
-  origin and loads no remote assets. Cross-origin submissions are restricted to
-  the documented default ChatGPT sandbox origin. Other host origins fail closed.
-- Local-network/browser sandbox permission may be required. If the host cannot
-  render MCP Apps or cannot reach loopback, show an error; never silently open a
-  browser, request a password in chat, or route it through tool arguments.
-- The card checks loopback connectivity before revealing the password fields.
-  If the host blocks the cross-origin iframe's loopback request, the card reports
-  that no password was sent. The embedding host must delegate loopback access;
-  plugin code cannot grant that host-level permission.
-- The helper uses local HTTP for the loopback channel. FMC HTTPS validation
-  remains enabled. Credentials and device details are saved in clear text in
-  `devices.yaml` in the plugin's local folder. On Unix systems, the file is
-  written with owner-only permissions. Keep it out of Git repositories, backups,
-  and synced folders. It remains accessible to processes and people with access
-  to your account or computer.
+The form never requests a username or password and has no local connection check.
+Saving does not authenticate, contact any device, deploy, change stored credentials,
+or write the legacy inventory JSON. Existing account, domain, CA, and other device
+settings are preserved. New entries store only the four inventory fields; local
+account configuration is required before connecting to them.
 
-Verified protocol support and JavaScript component tests do not establish that every
-ChatGPT/Codex rollout permits inline UI to reach a local listener. Test the card
-in a fresh local chat after updating the plugin.
+The app uses the host MCP tool bridge, with no local HTTP listener or remote
+assets. `device_inventory` opens it; `start_enrollment` remains a compatibility
+entrypoint and prefills a supplied name/address. `save_device_inventory` validates
+all rows before a locked, atomic YAML update. Save errors leave the form editable.
+If the response times out, reopen the inventory to inspect saved values before
+retrying. If the host cannot render MCP Apps, refresh the plugin and restart the
+host; the assistant must not claim the card was displayed or a save completed.
+
+The inventory file is ignored by Git, excluded from release archives, and written
+with owner-only permissions on Unix. Existing credentials in the same file remain
+private and are never returned to the form or model.
 
 ## Terminal alternative
 
-The terminal option is retained for device types or options not present in the
-card. It writes credentials to the same local YAML file.
+The terminal option separately configures accounts and advanced device settings.
+It writes credentials to the same local YAML file; the inventory form does not.
 
 macOS:
 
@@ -114,14 +104,10 @@ mode `0600`; on Windows, permissions inherit the plugin folder's ACLs, so keep
 that folder restricted to your user. Inventory and evidence remain in the
 per-user app data directories. `SFA_DATA_DIR` is an optional local path override
 for isolated tests/approved deployments; it is never provided as an MCP argument.
-The card writes the device record under `devices` and its password under
-`credentials`, keyed by `credential_ref`. You can add a device by copying the
-sample structure into the local file, with matching alias and credential
-reference. Quote passwords that contain YAML punctuation; the card handles
-quoting automatically.
-Existing Keychain/Credential Manager entries are not migrated or used by this
-version. Re-enroll each existing alias through the card; the old OS entries can
-be removed separately after confirming the YAML-backed connection works.
+New inventory entries contain `device_name`, `hostname`, `https_port`, and
+`ssh_port`. Existing runtime device metadata remains compatible and is preserved
+when updating inventory details. Credentials are configured separately through
+local hidden terminal entry; they are never collected by the inventory form.
 
 Browser sign-in is separate. The plugin never reads a stored password into chat
 or types it through a model-visible browser tool. Reuse an approved browser

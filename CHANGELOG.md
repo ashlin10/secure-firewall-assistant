@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.5
+
+- Replace credential enrollment with a device inventory form containing Device Name, Hostname/IP Address, HTTPS port, and SSH port for each device.
+- Save validated inventory rows atomically to local devices.yaml, preserving existing credentials and advanced settings.
+- Remove the local connection check, password fields, loopback listener, and automatic FMC connection from the form.
+- Add device_inventory and save_device_inventory tools; retain start_enrollment as an inventory compatibility entrypoint.
+
+
 ## 0.3.4
 
 - Save local device details and credentials in an ignored `devices.yaml` beside the plugin; keep only a credential-free example in source packages.

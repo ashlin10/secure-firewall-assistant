@@ -100,7 +100,7 @@ class SecretStore:
         except Exception:
             raise AssistantError("credential_file_unavailable", "The local devices.yaml file could not be read.") from None
         if not value:
-            raise AssistantError("credential_missing", "Enroll this credential using the private enrollment card.")
+            raise AssistantError("credential_missing", "Configure this credential locally through hidden terminal entry.")
         self.redactor.register(value)
         return value
 
