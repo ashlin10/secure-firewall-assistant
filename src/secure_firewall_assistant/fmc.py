@@ -154,4 +154,4 @@ class FMC:
     def compatibility(self) -> dict:
         return {"server_version": self.server_version,
                 "schema_device_version_verified": False,
-                "note": "The supplied file does not declare an FMC software version. Schema coverage requires device validation."}
+                "note": "Schema selection is reported separately. Exact version selection and latest fallback do not prove device compatibility."}

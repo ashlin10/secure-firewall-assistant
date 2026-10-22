@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from .errors import AssistantError
+from .inventory import DEVICE_TYPES
 from .security import Redactor, SecretStore
 from .state import Device, State
 
@@ -23,10 +24,20 @@ def parser():
     p = argparse.ArgumentParser(description="Secure Firewall Assistant local setup and diagnostics")
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("serve", help="Run the local MCP server")
+    remote = sub.add_parser("schema-serve", help="Run the shared read-only HTTP MCP schema service")
+    remote.add_argument("--directory", type=Path, required=True)
+    remote.add_argument("--host", default="0.0.0.0")
+    remote.add_argument("--port", type=int, default=8765)
+    remote.add_argument("--allowed-host", action="append")
+    publish = sub.add_parser("schema-publish", help="Publish a reviewed schema revision to a registry directory")
+    publish.add_argument("--directory", type=Path, required=True)
+    publish.add_argument("--schema", type=Path, required=True)
+    publish.add_argument("--fmc-version", required=True)
+    publish.add_argument("--revision", required=True)
     sub.add_parser("health", help="Inspect package and paths without device or credential access")
     sub.add_parser("list", help="List enrolled aliases")
     enroll = sub.add_parser("enroll", help="Save a private device and password through local hidden entry")
-    enroll.add_argument("kind", choices=["fmc", "ftd"])
+    enroll.add_argument("kind", choices=DEVICE_TYPES)
     enroll.add_argument("alias")
     enroll.add_argument("address", help="FMC HTTPS origin or FTD hostname/IP")
     enroll.add_argument("--username", required=True)
@@ -52,6 +63,14 @@ def main():
     if args.command == "serve":
         from .server import serve
         serve()
+        return
+    if args.command == "schema-serve":
+        from .schema_server import serve_schema
+        serve_schema(args.directory, args.host, args.port, args.allowed_host)
+        return
+    if args.command == "schema-publish":
+        from .schema_registry import publish
+        print(json.dumps(publish(args.directory, args.schema, args.fmc_version, args.revision)))
         return
     redactor = Redactor()
     try:

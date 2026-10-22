@@ -116,3 +116,17 @@ This registration pins a release path. After an upgrade, repeat it with the new
 installed release directory. If a future desktop version discovers the bundled
 server automatically, remove only the duplicate standalone registration with
 `codex mcp remove secure-firewall`; keep the plugin installed.
+
+## Shared schemas and format-2 inventory (0.4.0)
+
+Codex clients retain the local plugin and stdio execution server. They must also
+reach `http://10.196.150.41:8765/mcp` on the trusted lab network for initial schema
+selection. Later operations can use cached schemas if that service is unavailable.
+The registry is a separately hosted read-only HTTP MCP, not a cloud-hosted device
+executor. See [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md) for publishing schema updates.
+
+The inventory form writes format-2 grouped YAML with a device-type dropdown.
+Before using a pre-0.4.0 plugin again, restore the private pre-grouping backup;
+older releases do not understand format 2. Installation itself leaves inventory
+unchanged; saving through the new helper performs the migration. Start a new chat
+or restart the host before editing inventory with the updated tools.

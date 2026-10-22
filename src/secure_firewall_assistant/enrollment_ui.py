@@ -9,6 +9,7 @@ from filelock import FileLock
 from mcp.types import CallToolResult, TextContent
 
 from .errors import AssistantError
+from .inventory import DEVICE_TYPES
 from .state import ALIAS, atomic_json
 
 MIME = "text/html;profile=mcp-app"
@@ -16,9 +17,11 @@ MIME = "text/html;profile=mcp-app"
 
 def validate_row(row):
     required = {"device_name", "hostname", "https_port", "ssh_port"}
-    if not isinstance(row, dict) or not required <= set(row) or set(row) - required - {"username", "password"}:
+    if not isinstance(row, dict) or not required <= set(row) or set(row) - required - {"username", "password", "device_type"}:
         raise AssistantError("invalid_inventory", "Each device requires Device Name, Hostname/IP Address, HTTPS port, and SSH port.")
     name, host = row["device_name"], row["hostname"]
+    if row.get("device_type", "fmc") not in DEVICE_TYPES:
+        raise AssistantError("invalid_inventory", "Select a supported device type.")
     if not isinstance(name, str) or not ALIAS.fullmatch(name):
         raise AssistantError("invalid_inventory", "Device names must use 1–64 letters, digits, dots, underscores, or hyphens, starting with a letter or digit.")
     if not isinstance(host, str) or not host or len(host) > 253:
@@ -59,7 +62,7 @@ class EnrollmentUI:
         rows = []
         for name, device in self.state.inventory()["devices"].items():
             origin = urlsplit(device["address"]) if device["kind"] == "fmc" else None
-            rows.append({"device_name": name, "hostname": origin.hostname if origin else device["address"],
+            rows.append({"device_name": name, "device_type": device["kind"], "hostname": origin.hostname if origin else device["address"],
                          "https_port": (origin.port or 443) if origin else 443,
                          "ssh_port": device.get("port", 22), "username": device.get("username", ""),
                          "has_account": self._has_account(name, device)})
@@ -76,11 +79,11 @@ class EnrollmentUI:
         return bool(stored["devices"].get(name, {}).get("password") or
                     stored.get("credentials", {}).get(reference) or stored.get("secrets", {}).get(reference))
 
-    def start(self, alias="", address=""):
+    def start(self, alias="", address="", kind="fmc"):
         rows = self.rows()
         if alias and not any(row["device_name"] == alias for row in rows):
             origin = urlsplit(address) if "://" in address else None
-            rows.append({"device_name": alias, "hostname": (origin.hostname or "") if origin else address,
+            rows.append({"device_name": alias, "device_type": kind, "hostname": (origin.hostname or "") if origin else address,
                          "https_port": (origin.port or 443) if origin else 443, "ssh_port": 22,
                          "username": "", "has_account": False})
         public = {"status": "edit_device_inventory", "devices": rows,
@@ -117,6 +120,7 @@ class EnrollmentUI:
                 name = row["device_name"]
                 record = stored["devices"].get(name, existing.get(name, {})).copy()
                 update = dict(row)
+                record["kind"] = update.pop("device_type", record.get("kind", "fmc"))
                 if not update.get("password"):
                     update.pop("password", None)
                 record.update(update)

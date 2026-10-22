@@ -1,3 +1,10 @@
+# 0.4.0 — 2026-10-22
+
+- Add a shared read-only HTTP MCP schema service with administrative version/revision publishing.
+- Identify the supplied schema as FMC 10.5.0.0 and select the latest published version for missing versions.
+- Fetch and cache schemas locally, pin validation through execution and verification, and record selection/fallback evidence.
+- Group device YAML into six categories and add the device-type dropdown with credential-preserving migration.
+
 # Changelog
 
 ## 0.3.9

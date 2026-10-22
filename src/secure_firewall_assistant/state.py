@@ -11,6 +11,7 @@ from filelock import FileLock
 from platformdirs import user_config_path, user_data_path
 
 from .errors import AssistantError
+from .inventory import DEVICE_TYPES, normalize_inventory
 
 ALIAS = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$")
 
@@ -62,8 +63,8 @@ class Device:
     def __post_init__(self):
         if type(self.verify_ssl) is not bool:
             raise AssistantError("invalid_device", "verify_ssl must be true or false.")
-        if not ALIAS.fullmatch(self.alias) or self.kind not in ("fmc", "ftd"):
-            raise AssistantError("invalid_device", "Supply a valid device alias and kind (fmc or ftd).")
+        if not ALIAS.fullmatch(self.alias) or self.kind not in DEVICE_TYPES:
+            raise AssistantError("invalid_device", "Supply a valid device alias and supported device type.")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", self.credential_ref):
             raise AssistantError("invalid_device", "Username and a valid credential reference are required.")
         if self.kind == "fmc":
@@ -100,10 +101,7 @@ class State:
                 if name != Device(**fields).alias:
                     raise ValueError
             if self.device_file.exists():
-                local = yaml.safe_load(self.device_file.read_text(encoding="utf-8"))
-                if (not isinstance(local, dict) or local.get("format_version") != 1 or
-                        not isinstance(local.get("devices", {}), dict)):
-                    raise ValueError
+                local = normalize_inventory(yaml.safe_load(self.device_file.read_text(encoding="utf-8")))
                 for name, fields in local.get("devices", {}).items():
                     if "device_name" in fields:
                         from .enrollment_ui import validate_row

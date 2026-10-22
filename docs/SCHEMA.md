@@ -3,7 +3,7 @@
 The source document was `merged_oas3_10_5_0_0.json`, SHA-256
 `0ae1d4c207415fae1506b34782caa0196af14fec90d7696392a5a7e9ac25304f`.
 It contains OpenAPI 3.0.1, 889 paths, 1,623 distinct operation IDs, and 4,052
-component schemas. Its `info.version` is `1.0.0`, not a verified FMC version.
+component schemas. Its `info.version` is `1.0.0`; the project owner identifies the supplied API schema as FMC **10.5.0.0**. The initial published schema revision is `r1`.
 The user's original file was not modified.
 
 `data/provenance.json` records the exact source/sanitized hashes and transformations.
@@ -72,6 +72,6 @@ success. Inspect item statuses before resuming only missing items. Batch PUT and
 DELETE remain available through their exact schema-defined ordinary executor,
 with current reads and documented body/filter requirements.
 
-The VPN endpoint POST has no bulk parameter or array body in this catalog.
-Cisco's 10.1 REST object documentation lists the same parameters. This is a
-catalog limitation, not a claim that undocumented bulk behavior was tested.
+The maintained VPN endpoint POST declares native bulk with object/array bodies.
+The shared registry distributes the corrected schema. See [shared schema service](SCHEMA-SERVICE.md)
+for version selection, latest-version fallback, revision updates, and local caching.

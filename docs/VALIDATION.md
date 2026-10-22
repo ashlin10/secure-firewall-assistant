@@ -1,3 +1,12 @@
+# 0.4.0 validation — 2026-10-22
+
+- 118 automated tests cover existing REST/deployment guards, remote schema selection, revision immutability, cache outages/corruption, and typed YAML migration.
+- Live shared HTTP MCP on the authorized host: six read-only tools, health check, exact 10.5.0.0 selection, and latest-version fallback for 10.1.0.
+- Live local stdio: 17 tools, inventory MCP App HTML resource containing all six device types, four enrolled FMC aliases, and read-only FMCv-102 topology enumeration using remote schema 10.5.0.0 r1.
+- Existing account values and API-only secrets were compared in memory before/after migration; backups and owner-only YAML permissions were preserved. No credential values were logged.
+- MCP App resource/bridge behavior is verified separately from desktop rendering. A host restart/new session is required to replace tools already loaded in an active chat.
+- This release does not claim runtime VPN testing, FTD deployment, or new execution adapters for the four extra inventory categories.
+
 # Validation report — 21 October 2026
 
 ## 0.3.8 capability discovery and efficient batches

@@ -23,8 +23,8 @@ def test_inventory_only_save_and_readback_preserves_credentials(assistant, lab):
     ui.save([row(), row('lab-fmc-1', 'fmc.example.invalid')])
     saved = yaml.safe_load(assistant.state.device_file.read_text())
     assert 'credentials' not in saved
-    assert saved['devices']['lab-fmc-1']['password'] == 'SYNTHETIC-LOGIN-SENTINEL'
-    assert saved['devices']['new-device'] == {**row(), 'username':'', 'password':''}
+    assert saved['fmc']['lab-fmc-1']['password'] == 'SYNTHETIC-LOGIN-SENTINEL'
+    assert saved['fmc']['new-device'] == {**row(), 'kind':'fmc', 'username':'', 'password':''}
     assert assistant.state.inventory_path.read_bytes() == config_before
     assert assistant.state.inventory()['devices']['new-device']['address'] == 'https://[2001:db8::1]:12202'
     assert [r['device_name'] for r in ui.rows()] == ['lab-fmc-1', 'new-device']
@@ -84,7 +84,7 @@ def test_mcp_inventory_roundtrip_without_device_connections(assistant, lab):
             result = await client.call_tool('start_enrollment', {'alias':'fixture','address':'https://example.invalid:8443'})
             public = json.loads(result.content[0].text)
             assert public['status'] == 'edit_device_inventory'
-            assert public['devices'][-1] == {**row('fixture', 'example.invalid', 8443, 22), 'username':'', 'has_account':False}
+            assert public['devices'][-1] == {**row('fixture', 'example.invalid', 8443, 22), 'username':'', 'has_account':False, 'device_type':'fmc'}
             result = await client.call_tool('save_device_inventory', {'devices':[row()]})
             assert 'inventory_saved' in result.content[0].text
             assert lab.calls == []

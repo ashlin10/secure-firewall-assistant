@@ -2,7 +2,9 @@
 
 ChatGPT Work loads a reusable skill and launches a local Python MCP helper over
 stdio. The helper reaches FMC HTTPS and optional FTD SSH from the user's machine.
-There is no listener, public service, inbound network port, jump host, or tunnel.
+The local helper has no inbound listener. A shared read-only HTTP MCP service
+on the internal schema host distributes versioned API catalogs. Device access
+continues from the user’s machine; no device credentials are sent to that service.
 The installed launch entry uses a durable prepared release so the desktop's
 plugin cache does not need to contain a portable virtual environment.
 
@@ -10,6 +12,7 @@ plugin cache does not need to contain a portable virtual environment.
 flowchart TD
   OpenAI[OpenAI reasoning services] <--> Work[ChatGPT desktop Work local task]
   Work <-->|local process pipes| Helper[Local MCP helper]
+  Helper <-->|HTTP MCP: schema packages only| Registry[Shared schema registry]
   Helper --> Inventory[Private per-user inventory]
   Helper --> CredentialFile[Ignored local devices.yaml]
   Helper -->|HTTPS| FMC[Lab FMC]
@@ -44,7 +47,7 @@ conversation or when the computer is unavailable. No plugin hooks are used;
 configuration/deployment checks live in the service itself.
 
 If a workspace blocks local plugins, obtain access through its administrator.
-A different architecture could use an authenticated remote HTTPS MCP app and
+Device execution could alternatively use an authenticated remote HTTPS MCP app and
 per-user outbound local agents to reach private labs while retaining local
 credentials. That requires additional hosting, app registration, user-to-agent
 authorization, and policy review; it is not implemented or claimed as an automatic
@@ -127,3 +130,17 @@ or model. API configuration secrets continue to use local references. A blank
 password preserves the existing value. The trash button queues an explicit local
 device deletion until Save inventory; deletion also removes legacy metadata and
 login references. Inventory saves do not contact FMC or FTD.
+
+## Shared schemas and typed inventory (0.4.0)
+
+See [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md) for the deployed read-only schema MCP.
+The local discovery tools resolve a catalog per target. Entire operations pin
+that catalog in a context propagated into independent batch workers; concurrent
+FMC targets do not change each other's validation schema. The initial schema is
+10.5.0.0; absent versions select the latest published version as requested.
+
+Inventory format 2 uses six top-level category mappings: `fmc`, `ftd`, `endpoints`,
+`traffic_generators`, `routers`, `switches`. Aliases are unique across all groups.
+The runtime retains a flat alias index; the UI and CLI support all categories.
+Legacy YAML remains readable and migrates with a backup on save. Passwords and
+API-only secrets remain local and are excluded from distributions.

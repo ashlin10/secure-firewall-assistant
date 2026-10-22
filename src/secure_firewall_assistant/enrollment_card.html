@@ -31,6 +31,13 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
     remove.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>';
     remove.addEventListener('click',()=>{if(pending)return;const name=rowNames.get(inputs);if(savedNames.has(name))deletedNames.add(name);rows=rows.filter(row=>row!==inputs);group.remove();resize()});
     group.appendChild(remove);
+    const typeLabel=document.createElement('label');typeLabel.textContent='Device type';
+    const typeSelect=document.createElement('select');typeSelect.required=true;
+    for(const [key,label] of [['fmc','FMC'],['ftd','FTD'],['endpoints','Endpoint'],['traffic_generators','Traffic generator'],['routers','Router'],['switches','Switch']]){
+      const option=document.createElement('option');option.value=key;option.textContent=label;typeSelect.appendChild(option);
+    }
+    typeSelect.value=value.device_type||'fmc';inputs.device_type=typeSelect;
+    typeLabel.appendChild(typeSelect);group.appendChild(typeLabel);
     for(const [key,label,type,defaultValue] of [
       ['device_name','Device Name','text',''],['hostname','Hostname/IP Address','text',''],
       ['https_port','HTTPS port','number',443],['ssh_port','SSH port','number',22],
@@ -95,7 +102,7 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
     send('tools/call',{name:'save_device_inventory',arguments:{devices,deleted_devices}},11);
     timer=setTimeout(()=>{busy(false);status('Save status is unknown. Reopen inventory to check saved values before retrying.','error')},20000);
   });
-  send('ui/initialize',{appInfo:{name:'Device inventory',version:'0.3.9'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
+  send('ui/initialize',{appInfo:{name:'Device inventory',version:'0.4.0'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
   const initial=window.openai?.toolResponseMetadata;
   if(initial)accept(initial.call_tool_result||initial.mcp_tool_result||initial);
 })();

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "secure-firewall-assistant"
-version = "0.3.9"
+version = "0.4.0"
 description = "Local, schema-driven Cisco Secure Firewall tools for ChatGPT Work"
 requires-python = ">=3.12,<3.13"
 dependencies = [

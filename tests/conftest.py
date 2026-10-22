@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from secure_firewall_assistant.fmc import FMC
+from secure_firewall_assistant.schema_registry import BundledCatalogProvider
 from secure_firewall_assistant.security import Redactor, SecretStore
 from secure_firewall_assistant.service import Assistant
 from secure_firewall_assistant.state import Device, State
@@ -100,6 +101,8 @@ def assistant(state, lab):
         secrets.redactor = redactor
         return FMC(device, secrets, redactor, transport=httpx.MockTransport(lab.handle))
 
-    value = Assistant(state=state, secrets=store, client_factory=factory)
+    value = Assistant(state=state, secrets=store, client_factory=factory, catalog_provider=BundledCatalogProvider())
+    value._bootstrap_catalog = value.catalog_provider.get()
+    value.catalog_provider.get = lambda version="": value._bootstrap_catalog
     yield value
     value.close()

@@ -9,6 +9,7 @@ import yaml
 from filelock import FileLock
 
 from .errors import AssistantError
+from .inventory import grouped_inventory, normalize_inventory
 from .state import Device, plugin_root
 
 SENSITIVE = re.compile(
@@ -60,23 +61,17 @@ class SecretStore:
         if not self.path.exists():
             return {"format_version": 1, "devices": {}}
         try:
-            value = yaml.safe_load(self.path.read_text(encoding="utf-8"))
-            if (not isinstance(value, dict) or value.get("format_version") != 1 or
-                    not isinstance(value.get("devices", {}), dict) or
-                    not isinstance(value.get("credentials", {}), dict) or
-                    any(not isinstance(k, str) or not isinstance(v, str)
-                        for k, v in value.get("credentials", {}).items())):
-                raise ValueError
-            value.setdefault("devices", {})
-            if (not isinstance(value.get("secrets", {}), dict) or
-                    any(not isinstance(k, str) or not isinstance(v, str)
-                        for k, v in value.get("secrets", {}).items())):
-                raise ValueError
-            return value
+            return normalize_inventory(yaml.safe_load(self.path.read_text(encoding="utf-8")))
         except (OSError, UnicodeError, yaml.YAMLError, ValueError, TypeError):
             raise AssistantError("credential_file_invalid", "The local devices.yaml file is invalid; repair it from the sample file.") from None
 
     def _write(self, value: dict):
+        if self.path.exists():
+            backup = self.path.with_name(".sfa-devices-pre-grouped.backup")
+            if not backup.exists():
+                fd = os.open(backup, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "wb") as out:
+                    out.write(self.path.read_bytes())
         # Migrate legacy login references into each device; retain API-only secrets.
         if value.get("credentials") and self.path.exists():
             backup = self.path.with_name(".sfa-devices-pre-inline.backup")
@@ -103,7 +98,7 @@ class SecretStore:
             if os.name != "nt":
                 os.fchmod(fd, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as out:
-                yaml.safe_dump(value, out, sort_keys=False, allow_unicode=True)
+                yaml.safe_dump(grouped_inventory(value), out, sort_keys=False, allow_unicode=True)
                 out.flush()
                 os.fsync(out.fileno())
             os.replace(temporary, self.path)

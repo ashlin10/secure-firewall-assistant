@@ -27,7 +27,7 @@ use execute_configuration_batch for independent creates, never guess bulk suppor
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.3.9", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.4.0", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -86,9 +86,9 @@ def build_server(assistant: Assistant | None = None):
         return enrollment.start()
 
     @expose("start_enrollment", "Compatibility entrypoint for the device inventory form. Only local inventory metadata is saved.", meta=inventory_meta)
-    def enroll(kind: Literal["fmc", "ftd"] = "fmc", alias: str = "", address: str = "", username: str = "",
+    def enroll(kind: Literal["fmc", "ftd", "endpoints", "traffic_generators", "routers", "switches"] = "fmc", alias: str = "", address: str = "", username: str = "",
                domain: str | None = None, confirm_details: bool = False) -> CallToolResult:
-        return enrollment.start(alias, address)
+        return enrollment.start(alias, address, kind)
 
     @expose("save_device_inventory", "Save device details and per-device account fields from the inventory app. Blank passwords preserve existing values. Explicit deleted_devices removes local entries. Never contacts devices.", write=True, meta={"ui": {"visibility": ["app"]}})
     def save_device_inventory(devices: list[dict], deleted_devices: list[str] | None = None) -> dict:
@@ -100,16 +100,19 @@ def build_server(assistant: Assistant | None = None):
 
     @expose("discover_operations", "Search supported schema operations. Special operational writes are cataloged but blocked in v1.")
     def discover(query: str = "", method: str = "", offset: int = 0, limit: int = 15,
-                 bulk_only: bool = False) -> dict:
-        return assistant.catalog.search(query, method, offset, limit, bulk_only)
+                 bulk_only: bool = False, target: str | None = None) -> dict:
+        catalog = assistant.catalog_for(target)
+        return {**catalog.search(query, method, offset, limit, bulk_only), "schema_selection": catalog.provenance}
 
     @expose("describe_operation", "Get path, parameters, body schema references, effects, and response schemas.")
-    def describe(operation_id: str) -> dict:
-        return assistant.catalog.describe(operation_id)
+    def describe(operation_id: str, target: str | None = None) -> dict:
+        catalog = assistant.catalog_for(target)
+        return {**catalog.describe(operation_id), "schema_selection": catalog.provenance}
 
     @expose("describe_schema", "Read one referenced component schema by its exact name.")
-    def schema(name: str) -> dict:
-        return assistant.catalog.schema(name)
+    def schema(name: str, target: str | None = None) -> dict:
+        catalog = assistant.catalog_for(target)
+        return {**catalog.schema(name), "schema_selection": catalog.provenance}
 
     @expose("read_configuration", "Execute a catalog read; defaults to expanded results and bounded complete pagination.")
     def read(target: str, operation_id: str, path_parameters: dict | None = None,

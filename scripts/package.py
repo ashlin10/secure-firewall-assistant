@@ -16,7 +16,7 @@ TOP = {"plugin.json", "mcp.json", "pyproject.toml", "uv.lock", ".python-version"
        "CHANGELOG.md", "CONTRIBUTING.md", "NOTICE.md", "Install.command", "Manage.command", "Install.ps1", "Manage.ps1"}
 TOP.add(".mcp.json")
 TOP.add("devices.example.yaml")
-DIRECTORIES = {"src", "skills", "docs", "scripts", ".codex-plugin"}
+DIRECTORIES = {"src", "skills", "docs", "scripts", "deployment", ".codex-plugin"}
 EXCLUDED_PARTS = {"__pycache__", ".venv", ".pytest_cache", ".ruff_cache"}
 
 

@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.3.9
+# Secure Firewall Assistant 0.4.0
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
@@ -77,3 +77,18 @@ No workspace account is created automatically. See [CONTRIBUTING.md](CONTRIBUTIN
 Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) for data flow and trust boundaries.
 Never put actual passwords in chat, source files, issue reports, command-line
 arguments, environment variables, or support logs.
+
+## Shared schema service and typed inventory (0.4.0)
+
+API schemas are maintained by a shared read-only HTTP MCP service. The local
+helper obtains the catalog for each FMC version, caches it, and keeps device
+connections and execution local. Unknown versions use the latest published
+schema and report that fallback. The initial catalog is FMC 10.5.0.0, revision r1.
+See [schema service operations](docs/SCHEMA-SERVICE.md).
+
+`devices.yaml` format 2 groups devices under `fmc`, `ftd`, `endpoints`,
+`traffic_generators`, `routers`, and `switches`. The inventory form has a device
+type selector. Existing format-1 files remain readable and migrate on save,
+with an owner-readable backup. Existing accounts and API secrets are preserved.
+The additional categories are inventory support; existing FMC REST execution
+and bounded FTD diagnostics retain their device-type guards.

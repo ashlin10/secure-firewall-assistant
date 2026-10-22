@@ -4,7 +4,7 @@
   "sanitized_sha256": "ea9ff8e286a7ffa71c5bb6d4e39b1f0a8adf59503327f1297ecbc3105c64158c",
   "openapi": "3.0.1",
   "info_version": "1.0.0",
-  "declared_device_version": null,
+  "declared_device_version": "10.5.0.0",
   "paths": 889,
   "operations": 1623,
   "schemas": 4052,
@@ -17,5 +17,7 @@
     "Replaced non-public-documentation example URLs",
     "No missing definitions fabricated; affected response validation reports a warning",
     "Declared createVpnEndpoint bulk query and single/array request bodies; bulk support confirmed by the project owner (2026-10-21)"
-  ]
+  ],
+  "schema_revision": "r1",
+  "version_source": "Project owner identified supplied schema as FMC 10.5.0.0"
 }

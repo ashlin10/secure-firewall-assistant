@@ -127,3 +127,17 @@ inventory app or local hidden terminal entry.
 Browser sign-in is separate. The plugin never reads a stored password into chat
 or types it through a model-visible browser tool. Reuse an approved browser
 session or complete sign-in through the host's secure user flow when needed.
+
+## Device categories (0.4.0)
+
+The form includes a Device type dropdown: FMC, FTD, Endpoint, Traffic generator,
+Router, and Switch. YAML format 2 stores these under the top-level `fmc`, `ftd`,
+`endpoints`, `traffic_generators`, `routers`, and `switches` mappings. Empty
+categories remain present. Aliases must be unique across categories. Changing a
+type moves its entry while retaining its account; blank passwords preserve the
+saved password. Entries without a type in old format-1 files default to FMC.
+Existing explicit FTD types are preserved. Legacy metadata and API-only secrets
+are retained, and `.sfa-devices-pre-grouped.backup` preserves the pre-migration file.
+The form never exposes saved passwords. These new categories provide inventory
+storage; they do not add execution adapters for endpoints, routers, switches, or
+traffic generators.

@@ -1,28 +1,69 @@
+import functools
 import hashlib
+import inspect
 import json
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import ContextVar, copy_context
 from threading import Event
 
 from .catalog import Catalog
 from .errors import AssistantError
 from .evidence import Evidence, compare
 from .fmc import FMC
+from .schema_registry import RemoteCatalogProvider, version_key
 from .security import Redactor, SecretStore
 from .state import State
 
 
+def selected_schema(function):
+    @functools.wraps(function)
+    def wrapped(self, target, *args, **kwargs):
+        # Reject malformed scopes and known forbidden operations before device login.
+        bound = inspect.signature(function).bind(self, target, *args, **kwargs)
+        arguments = bound.arguments
+        if function.__name__ in {"execute", "execute_batch"}:
+            operation = self._bootstrap_catalog.operations.get(arguments.get("op_id"))
+            if operation and (operation["effect"] != "configuration" or
+                              (function.__name__ == "execute_batch" and operation["method"] != "post")):
+                raise AssistantError("operation_guard", "Use ordinary configuration operations with the appropriate executor.")
+            if not arguments.get("authorization_request", "").strip():
+                raise AssistantError("request_scope_required", "Supply the current user's configuration request.")
+        if function.__name__ == "verify" and not arguments.get("exact", False) and arguments.get("expected") in ({}, []):
+            raise AssistantError("expectations_required", "Specify meaningful expected fields, or use exact mode.")
+        active = self._catalog_context.get()
+        if active is not None:
+            return function(self, target, *args, **kwargs)
+        catalog = self.catalog_for(target)
+        token = self._catalog_context.set(catalog)
+        try:
+            return function(self, target, *args, **kwargs)
+        finally:
+            self._catalog_context.reset(token)
+    return wrapped
+
+
 class Assistant:
-    def __init__(self, state=None, secrets=None, client_factory=FMC):
+    def __init__(self, state=None, secrets=None, client_factory=FMC, catalog_provider=None):
         self.state = state or State()
         self.redactor = Redactor()
         self.secrets = secrets or SecretStore(self.redactor)
-        self.catalog = Catalog()
+        self._bootstrap_catalog = Catalog()
+        self._catalog_context = ContextVar("selected_fmc_catalog", default=None)
+        self.catalog_provider = catalog_provider or RemoteCatalogProvider(self.state.data / "schema-cache")
         self.evidence = Evidence(self.state, self.redactor)
         self.clients = {}
         self.client_factory = client_factory
         self.previews = {}
+
+    @property
+    def catalog(self):
+        return self._catalog_context.get() or self._bootstrap_catalog
+
+    def catalog_for(self, target=None):
+        version = self.client(target).version(refresh=True) if target else ""
+        return self.catalog_provider.get(version)
 
     def client(self, target: str) -> FMC:
         device = self.state.device(target, "fmc")
@@ -34,12 +75,15 @@ class Assistant:
         return self.clients[target]
 
     def close(self):
+        self.catalog_provider.close()
         for client in self.clients.values():
             client.close()
 
     def health(self) -> dict:
-        return {"version": "0.3.9", "devices_enrolled": len(self.state.aliases()),
-                "schema": self.catalog.provenance, "network_access_tested": False,
+        return {"version": "0.4.0", "devices_enrolled": len(self.state.aliases()),
+                "schema": self._bootstrap_catalog.provenance, "network_access_tested": False,
+                "schema_service": {"url": getattr(self.catalog_provider, "url", None), "cache_directory": str(self.state.data / "schema-cache"),
+                                   "missing_version_policy": "latest", "refresh_seconds": 60},
                 "credential_file": str(self.secrets.path),
                 "runtime_writes": "deployment tool only; special operational APIs disabled",
                 "private_config_directory": str(self.state.config), "private_data_directory": str(self.state.data)}
@@ -49,12 +93,16 @@ class Assistant:
         version = client.version(refresh=True)
         return {"target": target, "domain": client.domain_name, "domain_uuid": client.domain,
                 "server_version": version, "compatibility": client.compatibility(),
+                "schema_selection": self.catalog_for(target).provenance,
                 "tls_verification": bool(client.device.verify_ssl or client.device.ca_bundle)}
 
     def _call(self, target: str, op_id: str, path: dict | None = None, query: dict | None = None,
               headers: dict | None = None, body=None) -> dict:
         client = self.client(target)
         client.authenticate()
+        selected_version = self.catalog.provenance.get("requested_fmc_version")
+        if selected_version and client.server_version and version_key(selected_version) != version_key(client.server_version):
+            raise AssistantError("schema_target_version_changed", "FMC version changed after schema selection. Reconnect before continuing.")
         request = self.catalog.prepare(op_id, path or {}, query or {}, headers or {}, body, client.domain)
         result = client.request(**request)
         result["schema_warnings"] = self.catalog.validate_response(op_id, result["status"], result["body"])
@@ -108,6 +156,7 @@ class Assistant:
                           "paging": {"returned": len(items), "complete": result["complete"]}}
         return result
 
+    @selected_schema
     def read(self, target: str, op_id: str, path=None, query=None, all_pages=True, headers=None) -> dict:
         result = self._read(target, op_id, path, query, all_pages, headers)
         return self.record(target, op_id, result)
@@ -118,9 +167,11 @@ class Assistant:
                                    "domain": client.domain_name if client else None,
                                    "domain_uuid": client.domain if client else None,
                                    "compatibility": client.compatibility() if client else None,
+                                   "schema_selection": self.catalog.provenance,
                                    "deployment_performed": False, "runtime_verified": False,
                                    "result": result, **extra})
 
+    @selected_schema
     def execute(self, target: str, op_id: str, authorization_request: str, path=None, query=None,
                 headers=None, body=None) -> dict:
         op = self.catalog.get(op_id)
@@ -149,6 +200,7 @@ class Assistant:
                 receipt = self.evidence.save({"ok": False, "target": target, "operation_id": op_id,
                                               "authorization_request": authorization_request,
                                               "before": before, "deployment_performed": False,
+                                              "schema_selection": self.catalog.provenance,
                                               "error": error.result()["error"]})
                 error.details["run_id"] = receipt["run_id"]
                 raise
@@ -190,6 +242,7 @@ class Assistant:
             return {"status": "verification_failed", "error": error.result()["error"],
                     "note": "Write was accepted. Do not repeat it; reconcile with a read."}
 
+    @selected_schema
     def execute_batch(self, target, op_id, authorization_request, items, path=None, query=None,
                       headers=None, batch_size=100, max_workers=4):
         """Native bulk when declared; otherwise bounded independent POSTs, one collection read-back."""
@@ -262,7 +315,8 @@ class Assistant:
                 receipts = [receipt for chunk in chunks for receipt in submit(chunk)]
             else:
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    receipts = [receipt for group in executor.map(submit, chunks) for receipt in group]
+                    futures = [executor.submit(copy_context().run, submit, chunk) for chunk in chunks]
+                    receipts = [receipt for future in futures for receipt in future.result()]
             verification = {"status": "requires_explicit_verification"}
             try:
                 observed = self._read(target, collection["id"], path, all_pages=True, headers=headers)
@@ -286,6 +340,7 @@ class Assistant:
                                authorization_request=authorization_request, verification=verification,
                                note="Never replay uncertain or partially accepted batches. Reconcile saved state before retrying.")
 
+    @selected_schema
     def verify(self, target: str, op_id: str, expected, path=None, query=None, exact=False, headers=None) -> dict:
         # Prevent credential values from being copied into comparison requests or artifacts.
         if not exact and expected in ({}, []):
@@ -327,6 +382,7 @@ class Assistant:
             raise AssistantError("deployment_version_ambiguous", "Preview devices individually; a common deployment version was not returned.")
         return {"devices": selected, "version": next(iter(versions)), "scope": "all_pending_on_selected_devices"}
 
+    @selected_schema
     def preview_deployment(self, target: str, device_ids: list[str]) -> dict:
         if not device_ids or len(set(device_ids)) != len(device_ids) or len(device_ids) > 25:
             raise AssistantError("invalid_deployment_targets", "Supply 1–25 distinct FMC device UUIDs.")
@@ -340,6 +396,7 @@ class Assistant:
                                expires_in_seconds=300,
                                note="This preview does not authorize deployment. It includes all pending changes, including other users' changes.")
 
+    @selected_schema
     def deploy(self, target: str, preview_id: str, authorization_request: str, scope: str) -> dict:
         if not authorization_request.strip() or scope != "all_pending_on_selected_devices":
             raise AssistantError("explicit_deployment_scope_required", "Use only after the user explicitly requests deployment and authorizes all pending changes on these selected devices.")
