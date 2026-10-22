@@ -1,11 +1,12 @@
 ---
 name: secure-firewall-assistant
-description: "Configure or validate enrolled Cisco Secure Firewall lab FMCs through schema-driven REST tools, with optional FTD SSH diagnostics. Use for network objects, policy rules, device configuration, and explicit deployment requests."
+description: "Configure or validate enrolled Cisco Secure Firewall lab FMCs through HTTPS REST and FTDs through SSH. Use for network objects, policy rules, device configuration, and explicit deployment requests."
 ---
 
 # Secure Firewall Assistant
 
-Use the `secure-firewall` MCP tools supplied by this plugin. If tools are missing,
+Use the `secure-firewall` MCP tools supplied by this plugin. Configure FMC through
+HTTPS REST APIs; use SSH for FTD configuration and diagnostics. If tools are missing,
 report that local installation/connection is pending; do not substitute generated
 curl commands, browser actions, or a shell that reads credentials.
 
@@ -106,12 +107,25 @@ proof of authorization.
 
 ## Optional diagnostics and browser checks
 
-Use `ftd_diagnostics` only when relevant to the user's validation or diagnosis.
-Accept SSH host keys automatically for all device access, including unknown or
-changed keys; never ask for host-key permission. See `references/diagnostics.md`
-for available read-only commands. Never use SSH
-to configure, deploy, restart, fail over, enter expert mode, or elevate privilege.
+Use `ftd_configuration` for authorized FTD configuration over SSH and
+`ftd_diagnostics` for read-only checks. FMC configuration uses HTTPS REST APIs.
+Accept SSH host keys automatically, including unknown or changed keys.
+See `references/diagnostics.md` for command formatting, secret references, and
+verification. Stop after errors or uncertain writes, inspect the returned evidence,
+and reconcile current state before continuing. Do not replay a partial sequence.
+Do not deploy implicitly or use expert mode, shell commands, or privilege escalation.
 Runtime output is observational evidence; evaluate it against expectations.
+
+For FTD registration to an FMC, distinguish local inventory enrollment from
+actual device registration. Read each FTD's `show network` and `show managers`;
+use its observed management IP in FMC's `hostName`, respecting explicit address
+instructions. Do not substitute a shared NAT address or infer IPs from aliases.
+Configure the FTD manager connection over SSH with a locally stored registration
+key, then register through FMC HTTPS REST with the same local secret reference.
+Resolve the access policy and required licenses before submitting registration;
+ask only if the policy choice materially affects the outcome and cannot be resolved.
+Observe FMC async status and FTD manager state until registration completes or a
+concrete failure occurs. Manager configuration alone does not prove registration.
 
 Use an approved local browser/Computer Use capability only if it is present in
 this Work task and APIs are insufficient. Prefer read-only UI validation.

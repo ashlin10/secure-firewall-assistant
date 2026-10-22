@@ -20,7 +20,7 @@ flowchart TD
   Helper --> Inventory[Private per-user inventory]
   Helper --> CredentialFile[Ignored local devices.yaml]
   Helper -->|HTTPS| FMC[Lab FMC]
-  Helper -->|optional read-only SSH| FTD[Lab FTD]
+  Helper -->|SSH configuration and diagnostics| FTD[Lab FTD]
   FMC -->|only explicit deployment request| FTD
   Work -.-> Browser[Optional approved local browser]
 ```
@@ -121,8 +121,12 @@ approve OS security prompts. Browser sessions and REST tokens are separate.
 No browser automation or automatic browser password injection is included here.
 
 SSH diagnostics have a small read-only allowlist, automatically accepted host keys, bounded
-output, and recognized prompts. No expert mode, configuration, or privilege
-escalation. These prompt/command assumptions require live FTD validation.
+output, and recognized prompts. The separate `ftd_configuration` write tool accepts
+FTD `configure` commands as token arrays, resolves local secret references, and
+records partial outcomes and read-only verification. It never automatically retries
+writes or answers confirmation prompts. FMC writes continue through HTTPS REST.
+Neither SSH tool enters expert mode or elevates privilege. These prompt/command
+assumptions require live FTD validation.
 
 
 ## Inventory app accounts and deletion (0.3.6)

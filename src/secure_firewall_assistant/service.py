@@ -86,7 +86,7 @@ class Assistant:
                 "schema_service": {"url": getattr(self.catalog_provider, "url", None), "cache_directory": str(self.state.data / "schema-cache"),
                                    "missing_version_policy": "latest", "refresh_seconds": 60},
                 "credential_file": str(self.secrets.path),
-                "runtime_writes": "deployment tool only; special operational APIs disabled",
+                "runtime_writes": "FTD configure commands over SSH; FMC deployment tool only for deployment; special operational APIs disabled",
                 "private_config_directory": str(self.state.config), "private_data_directory": str(self.state.data)}
 
     def connect(self, target: str) -> dict:

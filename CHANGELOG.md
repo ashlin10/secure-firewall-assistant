@@ -1,3 +1,13 @@
+# 0.5.2 — 2026-10-22
+
+- Configure FMC through HTTPS REST and FTD through a dedicated SSH configuration
+  tool; keep diagnostics read-only.
+- Resolve CLI secret references locally, record partial outcomes without replay,
+  and collect read-only verification after FTD changes.
+- Clarify device registration using observed management IPs and matching local
+  registration keys.
+
+
 # 0.5.1 — 2026-10-22
 
 - Enable the documented single/bulk device registration collection API in the configuration executor.
@@ -30,6 +40,7 @@
 - Group device YAML into six categories and add the device-type dropdown with credential-preserving migration.
 
 # Changelog
+
 
 ## 0.3.9
 
