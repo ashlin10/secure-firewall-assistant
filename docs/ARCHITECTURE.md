@@ -143,7 +143,7 @@ that catalog in a context propagated into independent batch workers; concurrent
 FMC targets do not change each other's validation schema. The initial schema is
 10.5.0.0; absent versions select the latest published version as requested.
 
-Inventory format 2 uses six top-level category mappings: `fmc`, `ftd`, `endpoints`,
+Inventory format 3 uses six category lists nested under `devices`: `fmc`, `ftd`, `endpoints`,
 `traffic_generators`, `routers`, `switches`. Aliases are unique across all groups.
 The runtime retains a flat alias index; the UI and CLI support all categories.
 Legacy YAML remains readable and migrates with a backup on save. Passwords and

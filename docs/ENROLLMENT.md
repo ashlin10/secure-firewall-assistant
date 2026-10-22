@@ -140,8 +140,8 @@ session or complete sign-in through the host's secure user flow when needed.
 ## Device categories (0.4.0)
 
 The form includes a Device type dropdown: FMC, FTD, Endpoint, Traffic generator,
-Router, and Switch. YAML format 2 stores these under the top-level `fmc`, `ftd`,
-`endpoints`, `traffic_generators`, `routers`, and `switches` mappings. Empty
+Router, and Switch. YAML format 3 stores lists under `devices`, grouped by `fmc`, `ftd`,
+`endpoints`, `traffic_generators`, `routers`, and `switches`. Empty
 categories remain present. Aliases must be unique across categories. Changing a
 type moves its entry while retaining its account; blank passwords preserve the
 saved password. Entries without a type in old format-1 files default to FMC.

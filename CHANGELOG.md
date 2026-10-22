@@ -1,3 +1,7 @@
+# Inventory layout update — 2026-10-22
+
+- Save all six device types as lists beneath `devices`, with the type supplied by the section. Read legacy formats and preserve accounts during migration.
+
 # 0.5.0 — 2026-10-22
 
 - Bootstrap from the installed plugin root and prepare locked runtimes automatically on startup after a package update.

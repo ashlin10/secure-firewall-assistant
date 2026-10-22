@@ -113,8 +113,14 @@ class State:
                                    if key not in ("device_name", "hostname", "https_port", "ssh_port", "password")}
                         host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]
                         kind = runtime.get("kind", "fmc")
+                        saved_address = runtime.get("address")
                         runtime.update(alias=name, kind=kind, port=row["ssh_port"],
                                        address=f'https://{host}:{row["https_port"]}' if kind == "fmc" else row["hostname"])
+                        if kind == "fmc" and saved_address:
+                            previous = urlsplit(saved_address)
+                            if (previous.hostname == row["hostname"] and
+                                    (previous.port or 443) == row["https_port"]):
+                                runtime["address"] = saved_address
                         runtime.setdefault("username", "")
                         runtime.setdefault("credential_ref", name + "-auth")
                         device = Device(**runtime)

@@ -23,8 +23,8 @@ def test_inventory_only_save_and_readback_preserves_credentials(assistant, lab):
     ui.save([row(), row('lab-fmc-1', 'fmc.example.invalid')])
     saved = yaml.safe_load(assistant.state.device_file.read_text())
     assert 'credentials' not in saved
-    assert saved['fmc']['lab-fmc-1']['password'] == 'SYNTHETIC-LOGIN-SENTINEL'
-    assert saved['fmc']['new-device'] == {**row(), 'kind':'fmc', 'username':'', 'password':''}
+    assert next(r for r in saved['devices']['fmc'] if r['device_name'] == 'lab-fmc-1')['password'] == 'SYNTHETIC-LOGIN-SENTINEL'
+    assert next(r for r in saved['devices']['fmc'] if r['device_name'] == 'new-device') == {**row(), 'username':'', 'password':''}
     assert assistant.state.inventory_path.read_bytes() == config_before
     assert assistant.state.inventory()['devices']['new-device']['address'] == 'https://[2001:db8::1]:12202'
     assert [r['device_name'] for r in ui.rows()] == ['lab-fmc-1', 'new-device']

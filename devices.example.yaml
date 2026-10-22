@@ -1,14 +1,14 @@
-format_version: 2
-fmc:
-  lab-fmc-1:
-    device_name: lab-fmc-1
-    hostname: fmc.example.invalid
-    https_port: 443
-    ssh_port: 22
-    username: ""
-    password: ""
-ftd: {}
-endpoints: {}
-traffic_generators: {}
-routers: {}
-switches: {}
+format_version: 3
+devices:
+  fmc:
+    - device_name: lab-fmc-1
+      hostname: fmc.example.invalid
+      https_port: 443
+      ssh_port: 22
+      username: ""
+      password: ""
+  ftd: []
+  endpoints: []
+  traffic_generators: []
+  routers: []
+  switches: []

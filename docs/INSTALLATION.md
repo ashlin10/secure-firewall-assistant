@@ -153,7 +153,7 @@ selection. Later operations can use cached schemas if that service is unavailabl
 The registry is a separately hosted read-only HTTP MCP, not a cloud-hosted device
 executor. See [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md) for publishing schema updates.
 
-The inventory form writes format-2 grouped YAML with a device-type dropdown.
+The inventory form writes format-3 YAML with device-type lists nested under `devices` with a device-type dropdown.
 Before using a pre-0.4.0 plugin again, restore the private pre-grouping backup;
 older releases do not understand format 2. Installation itself leaves inventory
 unchanged; saving through the new helper performs the migration. Start a new chat

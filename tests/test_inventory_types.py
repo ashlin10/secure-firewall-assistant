@@ -14,18 +14,19 @@ def test_all_types_and_type_move_preserve_credentials(assistant, lab):
              'https_port':443,'ssh_port':22,'username':'fixture','password':'SYNTHETIC-'+kind} for kind in DEVICE_TYPES]
     result = ui.save(rows)
     saved = yaml.safe_load(assistant.state.device_file.read_text())
-    assert saved['format_version'] == 2
-    assert set(DEVICE_TYPES) <= set(saved)
-    assert 'devices' not in saved
+    assert saved['format_version'] == 3
+    assert set(DEVICE_TYPES) <= set(saved['devices'])
+    assert set(saved) == {'format_version', 'devices'}
     for kind in DEVICE_TYPES:
         alias = 'device-'+kind
-        assert alias in saved[kind]
+        assert alias in [r['device_name'] for r in saved['devices'][kind]]
         assert assistant.state.device(alias).kind == kind
         assert assistant.secrets.get(alias+'-auth') == 'SYNTHETIC-'+kind
     assert 'SYNTHETIC-' not in json.dumps(result)
     ui.save([{**rows[0], 'device_type':'routers','password':''}])
     saved = yaml.safe_load(assistant.state.device_file.read_text())
-    assert 'device-fmc' not in saved['fmc'] and 'device-fmc' in saved['routers']
+    assert not any(r['device_name'] == 'device-fmc' for r in saved['devices']['fmc'])
+    assert any(r['device_name'] == 'device-fmc' for r in saved['devices']['routers'])
     assert assistant.secrets.get('device-fmc-auth') == 'SYNTHETIC-fmc'
     assert assistant.state.device('device-fmc').address == 'fixture.example.invalid'
     with pytest.raises(AssistantError, match='FMC'):
@@ -41,7 +42,7 @@ def test_legacy_migration_preserves_all_accounts_and_api_secrets(assistant):
     with __import__('filelock').FileLock(str(store.path)+'.lock'):
         store._write(store._read())
     saved = yaml.safe_load(store.path.read_text())
-    assert 'legacy' in saved['fmc']
+    assert saved['devices']['fmc'][0]['device_name'] == 'legacy'
     assert store.get('legacy-auth') == 'SYNTHETIC-LEGACY'
     assert store.get('vpn') == 'SYNTHETIC-VPN'
     assert store.path.with_name('.sfa-devices-pre-grouped.backup').exists()
@@ -55,3 +56,19 @@ def test_invalid_grouping_and_unknown_type_rejected():
                   {'format_version':2,'fmc':[]}):
         with pytest.raises(ValueError):
             normalize_inventory(value)
+
+
+def test_format_two_remains_readable():
+    old = {'format_version': 2, 'ftd': {'old': {'hostname': 'fixture.invalid'}}}
+    result = normalize_inventory(old)
+    assert result['devices']['old']['kind'] == 'ftd'
+
+
+@pytest.mark.parametrize('sections', [
+    {'unknown': []}, {'fmc': {}}, {'fmc': [None]},
+    {'fmc': [{'device_name': 'same'}], 'ftd': [{'device_name': 'same'}]},
+    {'fmc': [{'device_name': 'bad', 'kind': 'ftd'}]},
+])
+def test_invalid_nested_sections(sections):
+    with pytest.raises(ValueError):
+        normalize_inventory({'format_version': 3, 'devices': sections})
