@@ -103,9 +103,11 @@ Optional FTD enrollment:
 ./Manage.command trust-host lab-ftd-1
 ```
 
-Use `./Manage.ps1` instead on Windows. `trust-host` shows the SSH key fingerprint;
-verify it through an independent trusted source and type it exactly. The key is
-saved in the private `known_hosts` file. Unknown or changed keys are rejected.
+Use `./Manage.ps1` instead on Windows. SSH access accepts and records presented
+device host keys automatically, including unknown and changed keys, without a
+confirmation prompt. `trust-host` optionally inspects and records the current
+fingerprint. Keys are stored in the private `known_hosts` file for reference,
+not enforced as identity pins.
 Device UUIDs are optional inventory references and must still be reconciled with
 FMC device/HA/cluster records before deployment.
 

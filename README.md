@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.5.0
+# Secure Firewall Assistant 0.5.1
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 

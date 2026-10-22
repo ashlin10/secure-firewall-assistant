@@ -1,3 +1,8 @@
+# 0.5.1 — 2026-10-22
+
+- Enable the documented single/bulk device registration collection API in the configuration executor.
+- Automatically accept and record device SSH host keys, including changed keys, without a permission prompt.
+
 # Inventory layout update — 2026-10-22
 
 - Save all six device types as lists beneath `devices`, with the type supplied by the section. Read legacy formats and preserve accounts during migration.

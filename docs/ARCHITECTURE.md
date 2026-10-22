@@ -120,7 +120,7 @@ Windows operates the active desktop. It cannot automate terminal apps or
 approve OS security prompts. Browser sessions and REST tokens are separate.
 No browser automation or automatic browser password injection is included here.
 
-SSH diagnostics have a small read-only allowlist, verified host keys, bounded
+SSH diagnostics have a small read-only allowlist, automatically accepted host keys, bounded
 output, and recognized prompts. No expert mode, configuration, or privilege
 escalation. These prompt/command assumptions require live FTD validation.
 

@@ -123,7 +123,7 @@ plugin installer or establish that your actual Work account can import it.
    known network object and policy against expected saved configuration.
 3. With an explicitly requested disposable-object test, create/read/update/delete
    it and confirm the FMC evidence. Confirm no deployment was submitted.
-4. Optionally enroll an FTD, verify its host key independently, and compare a
+4. Optionally enroll an FTD, check automatic host-key acceptance, and compare a
    bounded diagnostic with a manual known-good observation.
 5. Test an upgrade while retaining inventory and native credentials.
 6. Only with an explicit deployment request, review all pending changes on the

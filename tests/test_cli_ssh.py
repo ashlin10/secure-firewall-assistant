@@ -87,3 +87,49 @@ def test_cli_tls_verification_is_optional():
     args = ["enroll", "fmc", "alias", "https://fmc.example.invalid", "--username", "user"]
     assert cli.parser().parse_args(args).verify_ssl is False
     assert cli.parser().parse_args(args + ["--verify-ssl"]).verify_ssl is True
+
+
+@pytest.mark.parametrize('port', [22, 2222])
+def test_device_host_keys_are_accepted_and_replaced_without_prompt(tmp_path, port):
+    from types import SimpleNamespace
+
+    import paramiko
+
+    from secure_firewall_assistant.ssh import AcceptDeviceHostKey
+
+    state = SimpleNamespace(config=tmp_path / 'private')
+    device = SimpleNamespace(address='192.0.2.10', port=port)
+    policy = AcceptDeviceHostKey(state, device)
+    hostname = device.address if port == 22 else f'[{device.address}]:{port}'
+    for key in [paramiko.RSAKey.generate(1024), paramiko.RSAKey.generate(1024)]:
+        policy.missing_host_key(None, hostname, key)
+        recorded = paramiko.HostKeys(str(state.config / 'known_hosts'))
+        assert recorded[hostname][key.get_name()] == key
+
+
+def test_diagnostics_accepts_host_keys_without_loading_pins(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from secure_firewall_assistant import ssh
+
+    channel = Channel([b'firepower> '])
+    client = SimpleNamespace(
+        set_missing_host_key_policy=lambda policy: policies.append(policy),
+        connect=lambda *args, **kwargs: None,
+        invoke_shell=lambda **kwargs: channel,
+        close=lambda: None,
+    )
+    policies = []
+    monkeypatch.setattr(ssh.paramiko, 'SSHClient', lambda: client)
+    monkeypatch.setattr(ssh, 'receive', lambda channel: 'firepower> ')
+    device = SimpleNamespace(address='192.0.2.10', port=22, username='user', credential_ref='ref')
+    state = SimpleNamespace(config=tmp_path, device=lambda *args: device)
+    result = ssh.diagnostics(state, SimpleNamespace(get=lambda ref: 'synthetic'), 'ftd', ['show network'])
+    assert isinstance(policies[0], ssh.AcceptDeviceHostKey)
+    assert result['runtime_observed'] is True
+
+
+
+@pytest.mark.parametrize('prompt', [b'> ', b'# ', b'firepower> ', b'firepower# '])
+def test_ssh_accepts_bare_and_named_ftd_prompts(prompt):
+    assert receive(Channel([b'output\r\n' + prompt])).endswith(prompt.decode())

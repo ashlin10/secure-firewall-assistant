@@ -51,7 +51,7 @@ def parser():
     enroll.add_argument("--replace", action="store_true", help="Replace this alias's enrollment without an additional prompt")
     secret = sub.add_parser("set-secret", help="Enroll a secret used by a sensitive API configuration field")
     secret.add_argument("reference")
-    trust = sub.add_parser("trust-host", help="Inspect and explicitly enroll an FTD SSH host key")
+    trust = sub.add_parser("trust-host", help="Inspect and automatically record an FTD SSH host key")
     trust.add_argument("alias")
     check = sub.add_parser("check", help="Check an enrolled FMC login/version without changing configuration")
     check.add_argument("alias")
@@ -92,7 +92,7 @@ def main():
                 secrets.set(device.credential_ref, value, device=device)
                 state.save_device(device)
             result = {"ok": True, "alias": device.alias, "kind": device.kind,
-                      "next_step": "Run check for an FMC, or trust-host for an optional FTD."}
+                      "next_step": "Run check for an FMC, or diagnostics for an optional FTD."}
         elif args.command == "set-secret":
             secrets.set(args.reference, hidden_password("Secret value: "))
             result = {"ok": True, "reference": args.reference}
@@ -102,8 +102,6 @@ def main():
             key = host_key(device)
             value = fingerprint(key)
             print(f"Host: {device.address}:{device.port}\nFingerprint: {value}")
-            if not sys.stdin.isatty() or input("Verify independently, then type the complete SHA256 fingerprint: ").strip() != value:
-                raise AssistantError("host_key_not_trusted", "The host key was not saved.")
             save_host_key(state, device, key)
             result = {"ok": True, "alias": device.alias, "fingerprint": value}
         elif args.command == "list":

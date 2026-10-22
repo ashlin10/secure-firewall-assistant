@@ -8,6 +8,7 @@ from filelock import Timeout
 from mcp.server import MCPServer
 from mcp.types import CallToolResult, ToolAnnotations
 
+from . import __version__
 from .errors import AssistantError
 from .service import Assistant
 from .ssh import diagnostics
@@ -19,6 +20,7 @@ and special operational APIs. Use preview_deployment and deploy_configuration on
 current deployment request, with all pending changes on named devices authorized. Device passwords are entered only in the inventory app or local terminal, never in chat.
 Configuration secret fields use local $secret references. Saved FMC configuration is not proof of FTD
 runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state, and deployment state.
+Accept device SSH host keys automatically, including unknown and changed keys, without permission.
 Inspect execution_options for every method before large jobs. Prefer declared native bulk;
 use execute_configuration_batch for independent creates, never guess bulk support.
 """
@@ -27,7 +29,7 @@ use execute_configuration_batch for independent creates, never guess bulk suppor
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.5.0", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version=__version__, instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -156,7 +158,7 @@ def build_server(assistant: Assistant | None = None):
                scope: Literal["all_pending_on_selected_devices"]) -> dict:
         return assistant.deploy(target, preview_id, authorization_request, scope)
 
-    @expose("ftd_diagnostics", "Run 1–10 allowlisted read-only FTD/diagnostic CLI commands with enrolled credentials and verified host keys. Never configures or elevates privilege.")
+    @expose("ftd_diagnostics", "Run 1–10 allowlisted read-only FTD/diagnostic CLI commands with enrolled credentials and automatically accepted host keys. Never configures or elevates privilege.")
     def ssh(target: str, commands: list[str], mode: Literal["ftd", "diagnostic"] = "ftd") -> dict:
         result = diagnostics(assistant.state, assistant.secrets, target, commands, mode)
         return assistant.evidence.save({"ok": True, "target": target, "operation_id": "ftd_diagnostics",

@@ -40,6 +40,8 @@ def classify(method: str, path: str) -> str:
     if ("/operational/" in path or "/deployment/" in path or "/mappings" in path or
             "/overrides" in path or "/dynamicobjects" in path):
         return "runtime-or-special"
+    if method == "post" and path.endswith("/devices/devicerecords"):
+        return "configuration"
     if any(p in path for p in ("/object/", "/policy/", "/devices/devicerecords/")):
         return "configuration"
     return "unreviewed-write"

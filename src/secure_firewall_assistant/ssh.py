@@ -5,6 +5,7 @@ import socket
 import time
 
 import paramiko
+from filelock import FileLock
 
 from .errors import AssistantError
 
@@ -13,7 +14,7 @@ DIAGNOSTIC_PATTERNS = [
     r"show version", r"show failover", r"show failover state", r"show route", r"show conn count",
     r"show access-list(?: [A-Za-z0-9_.-]+)?", r"show interface(?: [A-Za-z0-9_.:/-]+)?",
 ]
-PROMPT = re.compile(r"(?m)^[A-Za-z0-9][A-Za-z0-9_.()/ :\-]*[>#]\s*\Z")
+PROMPT = re.compile(r"(?m)^(?:[A-Za-z0-9][A-Za-z0-9_.()/ :\-]*)?[>#]\s*\Z")
 
 
 def fingerprint(key):
@@ -38,14 +39,26 @@ def save_host_key(state, device, key):
 
     private_dir(state.config)
     path = state.config / "known_hosts"
-    keys = paramiko.HostKeys()
-    if path.exists():
-        keys.load(str(path))
-    hostname = device.address if device.port == 22 else f"[{device.address}]:{device.port}"
-    keys.add(hostname, key.get_name(), key)
-    keys.save(str(path))
-    if path.exists() and __import__("os").name != "nt":
-        path.chmod(0o600)
+    with FileLock(str(path) + ".lock"):
+        keys = paramiko.HostKeys()
+        if path.exists():
+            keys.load(str(path))
+        hostname = device.address if device.port == 22 else f"[{device.address}]:{device.port}"
+        keys.add(hostname, key.get_name(), key)
+        keys.save(str(path))
+        if path.exists() and __import__("os").name != "nt":
+            path.chmod(0o600)
+
+
+class AcceptDeviceHostKey(paramiko.MissingHostKeyPolicy):
+    """Accept and record every presented lab device key without prompting."""
+
+    def __init__(self, state, device):
+        self.state = state
+        self.device = device
+
+    def missing_host_key(self, client, hostname, key):
+        save_host_key(self.state, self.device, key)
 
 
 def validate_commands(commands: list[str], mode: str):
@@ -84,12 +97,9 @@ def receive(channel, timeout=12):
 def diagnostics(state, secrets, target: str, commands: list[str], mode="ftd") -> dict:
     validate_commands(commands, mode)
     device = state.device(target, "ftd")
-    known_hosts = state.config / "known_hosts"
-    if not known_hosts.exists():
-        raise AssistantError("ssh_trust_required", "Enroll and verify the FTD host key using the local trust-host utility.")
     client = paramiko.SSHClient()
-    client.load_host_keys(str(known_hosts))
-    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    # Do not load pinned keys: automatic acceptance also applies to replaced keys.
+    client.set_missing_host_key_policy(AcceptDeviceHostKey(state, device))
     try:
         client.connect(device.address, port=device.port, username=device.username,
                        password=secrets.get(device.credential_ref), look_for_keys=False, allow_agent=False,
@@ -108,11 +118,9 @@ def diagnostics(state, secrets, target: str, commands: list[str], mode="ftd") ->
                 "note": "Command output is evidence; evaluate it against the requested expectations."}
     except AssistantError:
         raise
-    except paramiko.BadHostKeyException:
-        raise AssistantError("ssh_host_key_changed", "The FTD host key differs from the enrolled key; investigate locally.") from None
     except paramiko.AuthenticationException:
         raise AssistantError("ssh_authentication_failed", "Check the locally enrolled FTD account.") from None
     except Exception:
-        raise AssistantError("ssh_connection_failed", "SSH diagnostics failed. Check access, host-key enrollment, and the FTD CLI context.") from None
+        raise AssistantError("ssh_connection_failed", "SSH diagnostics failed. Check access and the FTD CLI context.") from None
     finally:
         client.close()

@@ -107,3 +107,12 @@ def test_vpn_endpoint_bulk_validation(catalog):
         assert error.value.code == code
     assert any(op["id"] == "createVpnEndpoint" for op in
                catalog.search("endpoints", "post", bulk_only=True)["operations"])
+
+
+def test_registration_collection_is_executable_without_opening_special_operations(catalog):
+    operation = catalog.describe('createMultipleDevice')
+    assert operation['effect'] == 'configuration'
+    assert operation['execution_available'] is True
+    assert operation['execution_options']['bulk_create_supported'] is True
+    assert catalog.describe('createBulkRegistration')['execution_available'] is False
+    assert catalog.describe('deleteMultipleDevice')['execution_available'] is False
