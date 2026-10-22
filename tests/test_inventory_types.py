@@ -64,6 +64,44 @@ def test_format_two_remains_readable():
     assert result['devices']['old']['kind'] == 'ftd'
 
 
+def test_protocol_accounts_select_correct_login_and_preserve_other_password(assistant, lab):
+    ui = EnrollmentUI(assistant.state, assistant.secrets)
+    accounts = dict(ssh_username='ssh-fixture', ssh_password='SYNTHETIC-SSH',
+                    https_username='api-fixture', https_password='SYNTHETIC-HTTPS')
+    base = dict(hostname='fixture.invalid', https_port=443, ssh_port=2222)
+    ui.save([{**base, **accounts, 'device_name':'split-fmc', 'device_type':'fmc'},
+             {**base, **accounts, 'device_name':'split-ftd', 'device_type':'ftd'}])
+    assert assistant.state.device('split-fmc').username == 'api-fixture'
+    assert assistant.state.device('split-ftd').username == 'ssh-fixture'
+    assert assistant.secrets.get('split-fmc-auth') == 'SYNTHETIC-HTTPS'
+    assert assistant.secrets.get('split-ftd-auth') == 'SYNTHETIC-SSH'
+    assert assistant.secrets.get('split-fmc-auth', protocol='ssh') == 'SYNTHETIC-SSH'
+    assert assistant.secrets.get('split-ftd-auth', protocol='https') == 'SYNTHETIC-HTTPS'
+    ui.save([{**base, **accounts, 'device_name':'split-fmc', 'device_type':'fmc',
+              'ssh_password':'', 'https_password':'SYNTHETIC-ROTATED-HTTPS'}])
+    assert assistant.secrets.get('split-fmc-auth', protocol='ssh') == 'SYNTHETIC-SSH'
+    assert assistant.secrets.get('split-fmc-auth') == 'SYNTHETIC-ROTATED-HTTPS'
+    public = json.dumps(ui.start().model_dump())
+    assert 'SYNTHETIC-' not in public
+    saved = assistant.secrets._read()['devices']['split-fmc']
+    assert 'username' not in saved and 'password' not in saved
+    assert lab.calls == []
+
+
+def test_migration_copies_shared_account_to_both_protocols(assistant):
+    store = assistant.secrets
+    store.path.write_text(yaml.safe_dump({'format_version':3, 'devices':{'switches':[{
+        'device_name':'legacy-switch', 'hostname':'switch.invalid', 'https_port':443,
+        'ssh_port':2222, 'username':'legacy-user', 'password':'SYNTHETIC-SHARED'}]}}))
+    store._write(store._read())
+    record = store._read()['devices']['legacy-switch']
+    for protocol in ('ssh', 'https'):
+        assert record[protocol + '_username'] == 'legacy-user'
+        assert record[protocol + '_password'] == 'SYNTHETIC-SHARED'
+    assert 'username' not in record and 'password' not in record
+    assert assistant.state.device('legacy-switch').username == 'legacy-user'
+
+
 @pytest.mark.parametrize('sections', [
     {'unknown': []}, {'fmc': {}}, {'fmc': [None]},
     {'fmc': [{'device_name': 'same'}], 'ftd': [{'device_name': 'same'}]},

@@ -102,7 +102,7 @@ def diagnostics(state, secrets, target: str, commands: list[str], mode="ftd") ->
     client.set_missing_host_key_policy(AcceptDeviceHostKey(state, device))
     try:
         client.connect(device.address, port=device.port, username=device.username,
-                       password=secrets.get(device.credential_ref), look_for_keys=False, allow_agent=False,
+                       password=secrets.get(device.credential_ref, protocol="ssh"), look_for_keys=False, allow_agent=False,
                        timeout=10, auth_timeout=10, banner_timeout=10)
         channel = client.invoke_shell(width=160, height=48)
         receive(channel)
@@ -166,7 +166,7 @@ def configuration(state, secrets, target: str, authorization_request: str,
     try:
         with state.target_lock(target):
             client.connect(device.address, port=device.port, username=device.username,
-                           password=secrets.get(device.credential_ref), look_for_keys=False, allow_agent=False,
+                           password=secrets.get(device.credential_ref, protocol="ssh"), look_for_keys=False, allow_agent=False,
                            timeout=10, auth_timeout=10, banner_timeout=10)
             channel = client.invoke_shell(width=160, height=48)
             receive(channel)

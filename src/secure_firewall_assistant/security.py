@@ -10,7 +10,7 @@ import yaml
 from filelock import FileLock
 
 from .errors import AssistantError
-from .inventory import grouped_inventory, normalize_inventory
+from .inventory import grouped_inventory, login_value, normalize_inventory
 from .state import Device, plugin_root
 
 SENSITIVE = re.compile(
@@ -88,8 +88,11 @@ class SecretStore:
                 if not record.get("password"):
                     record["password"] = legacy[reference]
                 consumed.add(reference)
-            record.setdefault("username", "")
-            record.setdefault("password", "")
+            username = record.pop("username", "")
+            password = record.pop("password", "")
+            for protocol in ("ssh", "https"):
+                record.setdefault(protocol + "_username", username)
+                record.setdefault(protocol + "_password", password)
         remaining = {key: item for key, item in legacy.items() if key not in consumed}
         if remaining:
             value["secrets"] = remaining
@@ -109,12 +112,15 @@ class SecretStore:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
-    def get(self, reference: str) -> str:
+    def get(self, reference: str, protocol: str | None = None) -> str:
         self._check(reference)
+        if protocol not in (None, "ssh", "https"):
+            raise AssistantError("invalid_protocol", "Select SSH or HTTPS credentials.")
         try:
             with FileLock(str(self.path) + ".lock", timeout=15):
                 stored = self._read()
-                value = next((record.get("password") for name, record in stored["devices"].items()
+                value = next((login_value(record, protocol or ("https" if record.get("kind", "fmc") == "fmc" else "ssh"), "password")
+                              for name, record in stored["devices"].items()
                               if record.get("credential_ref", name + "-auth") == reference), None)
                 value = value or stored.get("secrets", {}).get(reference) or stored.get("credentials", {}).get(reference)
         except AssistantError:
@@ -142,13 +148,17 @@ class SecretStore:
                     record.update(device_name=device.alias, hostname=origin.hostname if origin else device.address,
                                   https_port=(origin.port or 443) if origin else record.get("https_port", 443),
                                   ssh_port=device.port, password=value)
+                    for transport in ("ssh", "https"):
+                        record[transport + "_username"] = device.username
+                        record[transport + "_password"] = value
                     stored["devices"][device.alias] = record
                 else:
                     matches = [record for name, record in stored["devices"].items()
                                if record.get("credential_ref", name + "-auth") == reference]
                     if matches:
                         for record in matches:
-                            record["password"] = value
+                            transport = "https" if record.get("kind", "fmc") == "fmc" else "ssh"
+                            record[transport + "_password"] = value
                     else:
                         stored.setdefault("secrets", {})[reference] = value
                 self._write(stored)

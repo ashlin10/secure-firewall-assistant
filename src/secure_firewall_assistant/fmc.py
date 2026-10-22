@@ -59,7 +59,7 @@ class FMC:
                     self._tokens(response)
                     self.refreshes += 1
                     return
-            password = self.secrets.get(self.device.credential_ref)
+            password = self.secrets.get(self.device.credential_ref, protocol="https")
             response = self._send("POST", "/api/fmc_platform/v1/auth/generatetoken",
                                   auth=httpx.BasicAuth(self.device.username, password))
             if response.status_code not in (200, 204) or not response.headers.get("X-auth-access-token"):

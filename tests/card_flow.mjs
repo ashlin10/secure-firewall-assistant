@@ -20,22 +20,22 @@ assert.equal(el('devices').children.length,1);
 deliver({method:'ui/notifications/tool-result',params:result});
 assert.equal(el('devices').children.length,1);
 const inputs=el('devices').children[0].children.slice(2).map(label=>label.children[0]);
-assert.deepEqual(inputs.map(n=>n.value),['fmc','fixture','example.invalid',8443,2222,'','']);
-inputs[5].value='fixture-user';inputs[6].value='  SYNTHETIC-PASSWORD  ';
+assert.deepEqual(inputs.map(n=>n.value),['fmc','fixture','example.invalid',8443,2222,'','','','']);
+inputs[5].value='fixture-ssh';inputs[6].value='  SYNTHETIC-SSH  ';inputs[7].value='fixture-https';inputs[8].value='  SYNTHETIC-HTTPS  ';
 el('form').listeners.submit({preventDefault(){}});
 assert.equal(el('save').disabled,true);
 const call=messages.find(m=>m.params?.name==='save_device_inventory');
-assert.deepEqual(JSON.parse(JSON.stringify(call.params.arguments)),{devices:[{...result.structuredContent.devices[0],device_type:'fmc',username:'fixture-user',password:'  SYNTHETIC-PASSWORD  '}],deleted_devices:[],...(enrollment?{new_only:true}:{})});
+assert.deepEqual(JSON.parse(JSON.stringify(call.params.arguments)),{devices:[{...result.structuredContent.devices[0],device_type:'fmc',ssh_username:'fixture-ssh',ssh_password:'  SYNTHETIC-SSH  ',https_username:'fixture-https',https_password:'  SYNTHETIC-HTTPS  '}],deleted_devices:[],...(enrollment?{new_only:true}:{})});
 deliver({id:11,result:{structuredContent:{error:{message:'Write failed'}}}});
 assert.equal(el('save').disabled,false);assert.equal(el('status').textContent,'Write failed');
 el('form').listeners.submit({preventDefault(){}});
 deliver({id:11,result:{structuredContent:{status:'inventory_saved'}}});
-assert.equal(el('status').dataset.state,'success');assert.equal(inputs[6].value,'');
+assert.equal(el('status').dataset.state,'success');assert.equal(inputs[6].value,'');assert.equal(inputs[8].value,'');
 assert.equal(messages.some(m=>m.params?.name==='connect_fmc'),false);
 if(enrollment){
   assert.equal(el('devices').children.length,1);
   const fresh=el('devices').children[0].children.slice(2).map(label=>label.children[0]);
-  assert.deepEqual(fresh.map(n=>n.value),['fmc','','',443,22,'','']);
+  assert.deepEqual(fresh.map(n=>n.value),['fmc','','',443,22,'','','','']);
 }
 el('add').listeners.click();assert.equal(el('devices').children.length,2);
 el('devices').children[0].children[1].listeners.click();

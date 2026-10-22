@@ -124,7 +124,7 @@ def test_diagnostics_accepts_host_keys_without_loading_pins(tmp_path, monkeypatc
     monkeypatch.setattr(ssh, 'receive', lambda channel: 'firepower> ')
     device = SimpleNamespace(address='192.0.2.10', port=22, username='user', credential_ref='ref')
     state = SimpleNamespace(config=tmp_path, device=lambda *args: device)
-    result = ssh.diagnostics(state, SimpleNamespace(get=lambda ref: 'synthetic'), 'ftd', ['show network'])
+    result = ssh.diagnostics(state, SimpleNamespace(get=lambda ref, **kwargs: 'synthetic'), 'ftd', ['show network'])
     assert isinstance(policies[0], ssh.AcceptDeviceHostKey)
     assert result['runtime_observed'] is True
 

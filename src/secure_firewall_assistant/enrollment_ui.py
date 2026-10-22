@@ -9,7 +9,7 @@ from filelock import FileLock
 from mcp.types import CallToolResult, TextContent
 
 from .errors import AssistantError
-from .inventory import DEVICE_TYPES
+from .inventory import DEVICE_TYPES, LOGIN_FIELDS, login_value
 from .state import ALIAS, atomic_json
 
 MIME = "text/html;profile=mcp-app"
@@ -17,7 +17,7 @@ MIME = "text/html;profile=mcp-app"
 
 def validate_row(row):
     required = {"device_name", "hostname", "https_port", "ssh_port"}
-    if not isinstance(row, dict) or not required <= set(row) or set(row) - required - {"username", "password", "device_type"}:
+    if not isinstance(row, dict) or not required <= set(row) or set(row) - required - {"username", "password", "device_type", *LOGIN_FIELDS}:
         raise AssistantError("invalid_inventory", "Each device requires Device Name, Hostname/IP Address, HTTPS port, and SSH port.")
     name, host = row["device_name"], row["hostname"]
     if row.get("device_type", "fmc") not in DEVICE_TYPES:
@@ -34,11 +34,14 @@ def validate_row(row):
             raise AssistantError("invalid_inventory", "Enter a valid hostname or IP address without a URL scheme, path, or port.") from None
     if any(type(row[key]) is not int or not 1 <= row[key] <= 65535 for key in ("https_port", "ssh_port")):
         raise AssistantError("invalid_inventory", "HTTPS and SSH ports must be whole numbers from 1 to 65535.")
-    for key in ("username", "password"):
+    for key in ("username", "password", *LOGIN_FIELDS):
         if key in row and (not isinstance(row[key], str) or len(row[key]) > 4096):
             raise AssistantError("invalid_inventory", "Username and password must be text of at most 4096 characters.")
     if row.get("password") and not row.get("username"):
         raise AssistantError("invalid_inventory", "Enter a username when setting a password.")
+    for protocol in ("ssh", "https"):
+        if row.get(protocol + "_password") and not row.get(protocol + "_username", row.get("username")):
+            raise AssistantError("invalid_inventory", "Enter the matching protocol username when setting a password.")
     return dict(row)
 
 
@@ -61,23 +64,29 @@ class EnrollmentUI:
 
     def rows(self):
         rows = []
-        for name, device in self.state.inventory()["devices"].items():
+        inventory = self.state.inventory()["devices"]
+        for name, device in inventory.items():
             origin = urlsplit(device["address"]) if device["kind"] == "fmc" else None
             rows.append({"device_name": name, "device_type": device["kind"], "hostname": origin.hostname if origin else device["address"],
                          "https_port": (origin.port or 443) if origin else 443,
-                         "ssh_port": device.get("port", 22), "username": device.get("username", ""),
+                         "ssh_port": device.get("port", 22),
                          "has_account": self._has_account(name, device)})
         # Preserve HTTPS metadata on FTD entries too.
         local = self.store._read()["devices"]
         for row in rows:
+            device = inventory[row["device_name"]]
             stored = local.get(row["device_name"], {})
             row["https_port"] = stored.get("https_port", row["https_port"])
+            for protocol in ("ssh", "https"):
+                row[protocol + "_username"] = login_value(stored or device, protocol, "username")
+                row["has_" + protocol + "_account"] = self._has_account(row["device_name"], device, protocol)
         return rows
 
-    def _has_account(self, name, device):
+    def _has_account(self, name, device, protocol=None):
         stored = self.store._read()
         reference = device.get("credential_ref", name + "-auth")
-        return bool(stored["devices"].get(name, {}).get("password") or
+        protocol = protocol or ("https" if device["kind"] == "fmc" else "ssh")
+        return bool(login_value(stored["devices"].get(name, {}), protocol, "password") or
                     stored.get("credentials", {}).get(reference) or stored.get("secrets", {}).get(reference))
 
     def start(self, alias="", address="", kind="fmc", *, new_only=False):
@@ -86,7 +95,8 @@ class EnrollmentUI:
             origin = urlsplit(address) if "://" in address else None
             rows.append({"device_name": alias, "device_type": kind, "hostname": (origin.hostname or "") if origin else address,
                          "https_port": (origin.port or 443) if origin else 443, "ssh_port": 22,
-                         "username": "", "has_account": False})
+                         "ssh_username": "", "https_username": "", "has_account": False,
+                         "has_ssh_account": False, "has_https_account": False})
         public = {"status": "enroll_devices" if new_only else "edit_device_inventory", "devices": rows,
                   "next_step": ("Add new devices and select Save new devices." if new_only else
                                 "Edit the device inventory form and select Save inventory.") +
@@ -128,8 +138,16 @@ class EnrollmentUI:
                 record = stored["devices"].get(name, existing.get(name, {})).copy()
                 update = dict(row)
                 record["kind"] = update.pop("device_type", record.get("kind", "fmc"))
-                if not update.get("password"):
-                    update.pop("password", None)
+                # Older clients may still submit a shared account; translate it once.
+                for protocol in ("ssh", "https"):
+                    if "username" in update:
+                        update.setdefault(protocol + "_username", update["username"])
+                    if update.get("password"):
+                        update.setdefault(protocol + "_password", update["password"])
+                    if not update.get(protocol + "_password"):
+                        update.pop(protocol + "_password", None)
+                update.pop("username", None)
+                update.pop("password", None)
                 record.update(update)
                 if "address" in record:
                     host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]

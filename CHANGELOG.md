@@ -1,3 +1,8 @@
+# 0.5.4
+
+- Store and edit separate SSH and HTTPS accounts per device, with shared-account migration.
+- Select protocol credentials for FMC REST and FTD SSH while preserving inventory-only saves.
+
 # 0.5.3 — 2026-10-22
 
 - Assume sensible defaults for unspecified configuration details and create a

@@ -11,7 +11,7 @@ from filelock import FileLock
 from platformdirs import user_config_path, user_data_path
 
 from .errors import AssistantError
-from .inventory import DEVICE_TYPES, normalize_inventory
+from .inventory import DEVICE_TYPES, LOGIN_FIELDS, login_value, normalize_inventory
 
 ALIAS = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$")
 
@@ -106,11 +106,12 @@ class State:
                     if "device_name" in fields:
                         from .enrollment_ui import validate_row
                         row = validate_row({key: fields[key] for key in
-                                            ("device_name", "hostname", "https_port", "ssh_port")})
+                                            ("device_name", "hostname", "https_port", "ssh_port",
+                                             "username", "password", *LOGIN_FIELDS) if key in fields})
                         if row["device_name"] != name:
                             raise ValueError
                         runtime = {key: value for key, value in fields.items()
-                                   if key not in ("device_name", "hostname", "https_port", "ssh_port", "password")}
+                                   if key not in ("device_name", "hostname", "https_port", "ssh_port", "password", *LOGIN_FIELDS)}
                         host = f'[{row["hostname"]}]' if ":" in row["hostname"] else row["hostname"]
                         kind = runtime.get("kind", "fmc")
                         saved_address = runtime.get("address")
@@ -121,11 +122,13 @@ class State:
                             if (previous.hostname == row["hostname"] and
                                     (previous.port or 443) == row["https_port"]):
                                 runtime["address"] = saved_address
-                        runtime.setdefault("username", "")
+                        runtime["username"] = login_value(fields, "https" if kind == "fmc" else "ssh", "username")
                         runtime.setdefault("credential_ref", name + "-auth")
                         device = Device(**runtime)
                     else:
-                        device = Device(**{key: value for key, value in fields.items() if key != "password"})
+                        runtime = {key: value for key, value in fields.items() if key not in ("password", *LOGIN_FIELDS)}
+                        runtime["username"] = login_value(fields, "https" if fields.get("kind", "fmc") == "fmc" else "ssh", "username")
+                        device = Device(**runtime)
                     if name != device.alias:
                         raise ValueError
                     # Only validated metadata enters the in-memory inventory;

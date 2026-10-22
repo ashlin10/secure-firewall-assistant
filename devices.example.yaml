@@ -5,8 +5,10 @@ devices:
       hostname: fmc.example.invalid
       https_port: 443
       ssh_port: 22
-      username: ""
-      password: ""
+      ssh_username: ""
+      ssh_password: ""
+      https_username: ""
+      https_password: ""
   ftd: []
   endpoints: []
   traffic_generators: []

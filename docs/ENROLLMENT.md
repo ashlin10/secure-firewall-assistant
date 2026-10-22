@@ -42,7 +42,7 @@ inventory to inspect saved values before retrying. Refresh the plugin and restar
 the host if it cannot render MCP Apps.
 
 Legacy top-level `credentials` entries migrate into the matching device's
-`password` field on save. API-only references remain in `secrets`, with no separate
+SSH and HTTPS password fields on save. API-only references remain in `secrets`, with no separate
 login credentials section. Migration saves a private
 `.sfa-devices-pre-inline.backup` beside the YAML before replacing the old format.
 Restore that backup before rolling back to a release without inline passwords.
@@ -131,7 +131,7 @@ that folder restricted to your user. Inventory and evidence remain in the
 per-user app data directories. `SFA_DATA_DIR` is an optional local path override
 for isolated tests/approved deployments; it is never provided as an MCP argument.
 New inventory entries contain `device_name`, `hostname`, `https_port`,
-`ssh_port`, `username`, and `password`. Existing runtime metadata is preserved
+`ssh_port`, `ssh_username`, `ssh_password`, `https_username`, and `https_password`. Existing runtime metadata is preserved
 when editing the same device name. Credentials can be entered through the
 inventory app or local hidden terminal entry.
 
@@ -152,3 +152,13 @@ are retained, and `.sfa-devices-pre-grouped.backup` preserves the pre-migration 
 The form never exposes saved passwords. These new categories provide inventory
 storage; they do not add execution adapters for endpoints, routers, switches, or
 traffic generators.
+
+## Separate protocol accounts
+
+Each device stores `ssh_username`, `ssh_password`, `https_username`, and
+`https_password`. FMC REST authentication selects the HTTPS account; FTD SSH
+selects the SSH account. Shared `username`/`password` entries remain readable
+and migrate to both protocol accounts on the next save. The inventory form edits
+both accounts independently and preserves each saved password when its field is
+blank. It never returns either password. CLI enrollment supplies the same account
+for both protocols. No connection is attempted during an inventory save.

@@ -42,13 +42,14 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
     for(const [key,label,type,defaultValue] of [
       ['device_name','Device Name','text',''],['hostname','Hostname/IP Address','text',''],
       ['https_port','HTTPS port','number',443],['ssh_port','SSH port','number',22],
-      ['username','Username','text',''],['password','Password','password','']]){
+      ['ssh_username','SSH username','text',''],['ssh_password','SSH password','password',''],
+      ['https_username','HTTPS username','text',''],['https_password','HTTPS password','password','']]){
       const wrapper=document.createElement('label');wrapper.textContent=label;
-      const input=document.createElement('input');input.type=type;input.required=!['username','password'].includes(key);input.value=value[key]??defaultValue;
+      const input=document.createElement('input');input.type=type;input.required=!key.endsWith('_username')&&!key.endsWith('_password');input.value=value[key]??defaultValue;
       if(type==='number'){input.min='1';input.max='65535';input.step='1'}
-      else{input.maxLength=key==='device_name'?64:['username','password'].includes(key)?4096:253}
-      if(key==='username')input.autocomplete='username';
-      if(key==='password'){input.autocomplete='new-password';input.placeholder=value.has_account?'Saved password (leave blank to keep)':'Enter password'}
+      else{input.maxLength=key==='device_name'?64:(key.endsWith('_username')||key.endsWith('_password'))?4096:253}
+      if(key.endsWith('_username'))input.autocomplete='username';
+      if(key.endsWith('_password')){input.autocomplete='new-password';input.value='';input.placeholder=value['has_'+key.split('_')[0]+'_account']?'Saved password (leave blank to keep)':'Enter password'}
       wrapper.appendChild(input);group.appendChild(wrapper);inputs[key]=input;
     }
     el('devices').appendChild(group);rows.push(inputs);resize();
@@ -85,7 +86,7 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
       if(!message.error && !message.result?.isError && value.status==='inventory_saved'){
         savedNames=new Set((value.devices||rows.map(row=>({device_name:row.device_name.value.trim()}))).map(row=>row.device_name));deletedNames.clear();
         for(const row of rows)rowNames.set(row,row.device_name.value.trim());
-        for(const row of rows){if(row.password.value)row.password.placeholder='Saved password (leave blank to keep)';row.password.value=''}
+        for(const row of rows)for(const key of ['ssh_password','https_password']){if(row[key].value)row[key].placeholder='Saved password (leave blank to keep)';row[key].value=''}
         if(enrollmentOnly){
           for(const group of [...el('devices').children])group.remove();
           rows=[];savedNames.clear();addRow();
@@ -100,7 +101,7 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
   el('add').addEventListener('click',()=>addRow());
   el('form').addEventListener('submit',event=>{
     event.preventDefault();if(pending)return;
-    const devices=rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,input])=>[key,key.endsWith('_port')?Number(input.value):key==='password'?input.value:input.value.trim()])));
+    const devices=rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,input])=>[key,key.endsWith('_port')?Number(input.value):key.endsWith('_password')?input.value:input.value.trim()])));
     busy(true);status('Saving inventory…');
     const names=new Set(devices.map(row=>row.device_name));
     const deleted_devices=[...deletedNames].filter(name=>!names.has(name));

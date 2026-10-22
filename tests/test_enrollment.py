@@ -23,8 +23,8 @@ def test_inventory_only_save_and_readback_preserves_credentials(assistant, lab):
     ui.save([row(), row('lab-fmc-1', 'fmc.example.invalid')])
     saved = yaml.safe_load(assistant.state.device_file.read_text())
     assert 'credentials' not in saved
-    assert next(r for r in saved['devices']['fmc'] if r['device_name'] == 'lab-fmc-1')['password'] == 'SYNTHETIC-LOGIN-SENTINEL'
-    assert next(r for r in saved['devices']['fmc'] if r['device_name'] == 'new-device') == {**row(), 'username':'', 'password':''}
+    assert next(r for r in saved['devices']['fmc'] if r['device_name'] == 'lab-fmc-1')['https_password'] == 'SYNTHETIC-LOGIN-SENTINEL'
+    assert next(r for r in saved['devices']['fmc'] if r['device_name'] == 'new-device') == {**row(), 'ssh_username':'', 'ssh_password':'', 'https_username':'', 'https_password':''}
     assert assistant.state.inventory_path.read_bytes() == config_before
     assert assistant.state.inventory()['devices']['new-device']['address'] == 'https://[2001:db8::1]:12202'
     assert [r['device_name'] for r in ui.rows()] == ['lab-fmc-1', 'new-device']
@@ -77,7 +77,7 @@ def test_mcp_inventory_roundtrip_without_device_connections(assistant, lab):
             html = resource['text']
             for absent in ('Check local connection', 'type="password"', 'fetch(', 'connect_fmc', '/probe'):
                 assert absent not in html
-            assert "['password','Password','password','']" in html
+            assert "['ssh_password','SSH password','password','']" in html
             assert 'Delete device' in html
             saver = next(t for t in tools if t.name == 'save_device_inventory')
             assert saver.meta['ui']['visibility'] == ['app']
@@ -85,7 +85,7 @@ def test_mcp_inventory_roundtrip_without_device_connections(assistant, lab):
             public = json.loads(result.content[0].text)
             assert public['status'] == 'enroll_devices'
             assert len(public['devices']) == 1
-            assert public['devices'][-1] == {**row('fixture', 'example.invalid', 8443, 22), 'username':'', 'has_account':False, 'device_type':'fmc'}
+            assert public['devices'][-1] == {**row('fixture', 'example.invalid', 8443, 22), 'ssh_username':'', 'https_username':'', 'has_account':False, 'has_ssh_account':False, 'has_https_account':False, 'device_type':'fmc'}
             result = await client.call_tool('save_device_inventory', {'devices':[row()]})
             assert 'inventory_saved' in result.content[0].text
             assert lab.calls == []
@@ -171,7 +171,7 @@ def test_legacy_credentials_migrate_without_losing_api_secrets(assistant):
     ui.save([row('lab-fmc-1', 'fmc.example.invalid')])
     saved = store._read()
     assert 'credentials' not in saved
-    assert saved['devices']['lab-fmc-1']['password'] == 'SYNTHETIC-LEGACY'
+    assert saved['devices']['lab-fmc-1']['https_password'] == 'SYNTHETIC-LEGACY'
     assert store.get('radius-ref') == 'SYNTHETIC-RADIUS'
     assert store.get('lab-fmc-1-auth') == 'SYNTHETIC-LEGACY'
     assert 'SYNTHETIC' not in json.dumps(ui.start().model_dump())

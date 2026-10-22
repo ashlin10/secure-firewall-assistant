@@ -3,6 +3,12 @@ import copy
 from urllib.parse import urlsplit
 
 DEVICE_TYPES = ("fmc", "ftd", "endpoints", "traffic_generators", "routers", "switches")
+LOGIN_FIELDS = ("ssh_username", "ssh_password", "https_username", "https_password")
+
+
+def login_value(record, protocol, field):
+    """Read protocol accounts while accepting the former shared account format."""
+    return record.get(f"{protocol}_{field}", record.get(field, ""))
 
 
 def normalize_inventory(value):
