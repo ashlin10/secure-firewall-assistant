@@ -7,6 +7,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar, copy_context
 from threading import Event
+from urllib.parse import urlsplit
 
 from . import __version__
 from .catalog import Catalog
@@ -97,6 +98,21 @@ class Assistant:
                 "schema_selection": self.catalog_for(target).provenance,
                 "tls_verification": bool(client.device.verify_ssl or client.device.ca_bundle)}
 
+    def prepare_registration_key(self, target: str, device: str, authorization_request: str) -> dict:
+        if not authorization_request.strip():
+            raise AssistantError("request_scope_required", "Supply the current user's registration request.")
+        manager = self.state.device(target, "fmc")
+        self.state.device(device, "ftd")
+        identity = json.dumps([target, device], ensure_ascii=True).encode()
+        reference = "ftd-registration-" + hashlib.sha256(identity).hexdigest()[:32]
+        created = self.secrets.ensure_registration_key(reference)
+        return self.evidence.save({"ok": True, "target": target, "device": device,
+                                   "operation_id": "prepare_registration_key",
+                                   "authorization_request": authorization_request,
+                                   "reference": reference, "created": created,
+                                   "manager_address": urlsplit(manager.address).hostname,
+                                   "deployment_performed": False, "devices_contacted": False})
+
     def _call(self, target: str, op_id: str, path: dict | None = None, query: dict | None = None,
               headers: dict | None = None, body=None) -> dict:
         client = self.client(target)
@@ -126,6 +142,7 @@ class Assistant:
                 raise AssistantError("invalid_page_size", "Use a page size from 1 to 1000.")
         result = self._call(target, op_id, path, query, headers)
         result["complete"] = True
+        self._normalize_empty_collection(result, paginated)
         if not all_pages or not paginated:
             if isinstance(result["body"], dict) and isinstance(result["body"].get("items"), list):
                 result["complete"] = not bool(result["body"].get("paging", {}).get("next"))
@@ -151,11 +168,23 @@ class Assistant:
                 break
             query["offset"] += len(batch)
             next_result = self._call(target, op_id, path, query, headers)
+            self._normalize_empty_collection(next_result, paginated)
             next_result["complete"] = True
             result = next_result
         result["body"] = {**result["body"], "items": items,
                           "paging": {"returned": len(items), "complete": result["complete"]}}
         return result
+
+    @staticmethod
+    def _normalize_empty_collection(result, paginated):
+        # FMC omits items for proven empty collections. Do not mask malformed or
+        # nonempty responses by assuming every missing items field means empty.
+        payload = result.get("body")
+        if paginated and isinstance(payload, dict) and "items" not in payload:
+            paging = payload.get("paging")
+            if (isinstance(paging, dict) and type(paging.get("count")) is int
+                    and paging["count"] == 0 and paging.get("pages") == 0 and not paging.get("next")):
+                payload["items"] = []
 
     @selected_schema
     def read(self, target: str, op_id: str, path=None, query=None, all_pages=True, headers=None) -> dict:

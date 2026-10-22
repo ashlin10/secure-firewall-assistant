@@ -19,8 +19,11 @@ curl commands, browser actions, or a shell that reads credentials.
    or reuse another conversation's target. Resolve names and domains explicitly.
 3. A clear configuration request authorizes ordinary in-scope reads, reference
    lookups, validation, writes, and read-back. Proceed without repetitive
-   confirmations. Ask only if target, domain, affected resources, expectations,
-   or requested changes are materially ambiguous.
+   confirmations. When details are unspecified, assume sensible defaults and
+   complete the task, including creating required default resources. Discover
+   actual device facts rather than inventing addresses or identifiers. State
+   material assumptions in the result. Ask only for critical details that cannot
+   be discovered or reasonably defaulted, or when a higher-priority rule requires it.
 4. For enrollment requests (enrol, enroll, add devices), call `start_enrollment` directly. Do not call `list_devices` or `device_inventory` first: enrollment must not show existing devices. It opens a dedicated form containing only new rows; safe supplied device details may prefill a new row. Saving uses `new_only: true`, rejects existing names and deletions atomically, and returns only newly added names. For an explicit inventory review/edit/delete request, call `device_inventory`. The embedded form contains Device type (FMC, FTD, Endpoint, Traffic generator, Router, Switch), Device Name, Hostname/IP Address, HTTPS port, SSH port, Username, and Password for each device, plus a trash icon. Saving stores username/password under that device in local `devices.yaml`. Blank passwords preserve saved values; deleted rows are removed only when Save inventory is selected. The app-only `save_device_inventory` tool accepts explicit `deleted_devices`; omitted devices are otherwise preserved. Never ask for passwords in chat or call the save tool with credentials as a model. The form uses the host MCP bridge and needs no loopback listener. Do not connect, check connectivity, or deploy as part of an inventory save. If the card is missing, report that MCP Apps UI requires a host refresh/restart. See `../../docs/ENROLLMENT.md`.
 5. Lab HTTPS accepts self-signed certificates by default. Strict certificate and hostname verification is optional through local `verify_ssl: true`, enrollment `--verify-ssl`, or a CA bundle. `connect_fmc` reports the effective `tls_verification` mode.
 6. For separate configuration/read requests, connect with `connect_fmc`. Devices without an account require setup through the inventory app or local terminal. Do not inspect or automate password entry. Saved passwords are not returned to the form or model.
@@ -120,10 +123,20 @@ For FTD registration to an FMC, distinguish local inventory enrollment from
 actual device registration. Read each FTD's `show network` and `show managers`;
 use its observed management IP in FMC's `hostName`, respecting explicit address
 instructions. Do not substitute a shared NAT address or infer IPs from aliases.
-Configure the FTD manager connection over SSH with a locally stored registration
-key, then register through FMC HTTPS REST with the same local secret reference.
-Resolve the access policy and required licenses before submitting registration;
-ask only if the policy choice materially affects the outcome and cannot be resolved.
+When no registration key is supplied, call `prepare_registration_key` for the
+exact FMC/FTD pair. It generates or reuses a random key locally and returns only
+its reference plus the enrolled FMC address. Never ask the user to choose or send
+a registration key. Use that address for the FTD manager connection over SSH,
+and the same local reference for FMC HTTPS registration.
+When no access policy is specified, reuse `Default Access Control Policy` in the
+selected domain. If absent, create it with default action `BLOCK` and no added
+rules, then verify it. Do not change an existing policy's rules or default action.
+Use the mandatory `ESSENTIALS` capability when optional licenses are unspecified.
+Respect documented engine compatibility and observed device settings. Set
+`skipDeployment: true` unless the user explicitly requests initial deployment.
+Read existing registrations and reconcile names and actual management IPs before
+creating records. For an empty collection, FMC may omit `items` while reporting
+`paging.count: 0` and `paging.pages: 0`; this is empty, not an unknown inventory.
 Observe FMC async status and FTD manager state until registration completes or a
 concrete failure occurs. Manager configuration alone does not prove registration.
 

@@ -1,3 +1,11 @@
+# 0.5.3 — 2026-10-22
+
+- Assume sensible defaults for unspecified configuration details and create a
+  default access policy for device registration when needed.
+- Generate and reuse registration keys locally for exact FMC/FTD pairs without
+  exposing values or reusing device login passwords.
+- Recognize FMC empty collections that omit items while reporting zero count.
+
 # 0.5.2 — 2026-10-22
 
 - Configure FMC through HTTPS REST and FTD through a dedicated SSH configuration

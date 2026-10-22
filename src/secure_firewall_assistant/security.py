@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
@@ -153,6 +154,24 @@ class SecretStore:
                 self._write(stored)
         except Exception:
             raise AssistantError("credential_file_write_failed", "The local devices.yaml file could not be saved.") from None
+
+    def ensure_registration_key(self, reference: str) -> bool:
+        """Create a reusable random registration key atomically; never return its value."""
+        self._check(reference)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with FileLock(str(self.path) + ".lock", timeout=15):
+            stored = self._read()
+            if any(record.get("credential_ref", name + "-auth") == reference
+                   for name, record in stored["devices"].items()):
+                raise AssistantError("registration_reference_conflict", "Registration keys cannot reuse device login references.")
+            value = stored.get("secrets", {}).get(reference) or stored.get("credentials", {}).get(reference)
+            created = not bool(value)
+            if created:
+                value = secrets.token_hex(16)
+                stored.setdefault("secrets", {})[reference] = value
+                self._write(stored)
+            self.redactor.register(value)
+            return created
 
     @staticmethod
     def _check(reference: str):

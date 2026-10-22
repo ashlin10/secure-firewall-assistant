@@ -21,11 +21,12 @@ def test_tool_discovery_and_mock_device_calls(assistant, lab):
         async with Client(build_server(assistant)) as client:
             tools = await client.list_tools()
             names = {t.name for t in tools.tools}
-            assert len(names) == 18
+            assert len(names) == 19
             assert {"execute_configuration", "deploy_configuration", "verify_configuration"} <= names
             annotations = {t.name: t.annotations for t in tools.tools}
             assert annotations["execute_configuration"].read_only_hint is False
             assert annotations["ftd_configuration"].read_only_hint is False
+            assert annotations["prepare_registration_key"].read_only_hint is False
             result = data(await client.call_tool("discover_operations", {"query": "networks", "method": "post"}))
             assert result["total"] >= 1
             result = data(await client.call_tool("execute_configuration", {
@@ -47,7 +48,7 @@ def test_real_stdio_process_is_clean_and_discovers_tools(tmp_path, mode):
                                        env={**os.environ, "SFA_DATA_DIR": str(tmp_path / "private")})
         async with Client(params, read_timeout_seconds=60, mode=mode) as client:
             tools = await client.list_tools()
-            assert len(tools.tools) == 18
+            assert len(tools.tools) == 19
             result = data(await client.call_tool("assistant_health"))
             assert result["schema"]["operations"] == 1623
             assert result["network_access_tested"] is False

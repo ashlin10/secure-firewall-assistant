@@ -182,7 +182,7 @@ def test_real_package_refresh_and_stable_dispatcher_over_stdio(tmp_path):
     async def health(command, args):
         async with Client(StdioServerParameters(command=command, args=args, env=environment),
                           read_timeout_seconds=180) as client:
-            assert len((await client.list_tools()).tools) == 18
+            assert len((await client.list_tools()).tools) == 19
             result = await client.call_tool('assistant_health')
             value = result.structured_content or json.loads(result.content[0].text)
             enrollment = await client.call_tool('start_enrollment')

@@ -1,3 +1,13 @@
+# 0.5.3 validation — 2026-10-22
+
+- 173 automated tests pass, including concurrent local registration key creation,
+  pair isolation, key reuse without exposing values or replacing login accounts,
+  and zero-count FMC responses without items. Malformed responses still fail.
+- Ruff and whitespace checks pass. The release retains explicit deployment guards
+  and uses observed management IPs for registration.
+- Verify installed stdio tools and MCP App resources separately from rendering in
+  an existing desktop chat; the host must reload to see new tool definitions.
+
 # 0.4.0 validation — 2026-10-22
 
 - 118 automated tests cover existing REST/deployment guards, remote schema selection, revision immutability, cache outages/corruption, and typed YAML migration.

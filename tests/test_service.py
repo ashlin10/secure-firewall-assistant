@@ -61,6 +61,59 @@ def test_pagination_never_follows_remote_links(assistant, lab):
     assert all(r.url.host == "fmc.example.invalid" for r in lab.calls)
 
 
+@pytest.mark.parametrize("all_pages", [True, False])
+def test_fmc_zero_count_without_items_is_verified_empty(assistant, lab, all_pages):
+    def empty(request):
+        if request.url.path.endswith("networks"):
+            return httpx.Response(200, json={"links": {}, "paging": {
+                "offset": 0, "limit": 0, "count": 0, "pages": 0}})
+    lab.override = empty
+    result = assistant.read("lab-fmc-1", "getAllNetworkObject", all_pages=all_pages)
+    assert result["result"]["body"]["items"] == []
+    assert result["result"]["complete"] is True
+    assert assistant.verify("lab-fmc-1", "getAllNetworkObject", {"items": []})["verification"]["status"] == "verified_in_fmc"
+
+
+@pytest.mark.parametrize("payload", [{}, {"paging": {"count": 1, "pages": 1}},
+                                     {"paging": {"count": 0}}, {"paging": {"count": False, "pages": 0}}])
+def test_missing_items_without_empty_collection_proof_is_rejected(assistant, lab, payload):
+    def malformed(request):
+        if request.url.path.endswith("networks"):
+            return httpx.Response(200, json=payload)
+    lab.override = malformed
+    with pytest.raises(AssistantError) as error:
+        assistant.read("lab-fmc-1", "getAllNetworkObject")
+    assert error.value.code == "pagination_shape_invalid"
+
+
+def test_registration_defaults_are_local_reusable_and_scoped(assistant, state, lab):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from secure_firewall_assistant.state import Device
+
+    for alias in ("lab-ftd-1", "lab-ftd-2"):
+        state.save_device(Device(alias, "ftd", "192.0.2.1", "fixture-user", alias + "-auth"))
+    def prepare(_):
+        return assistant.prepare_registration_key("lab-fmc-1", "lab-ftd-1", "Register the FTD")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(prepare, range(4)))
+    assert sum(r["created"] for r in results) == 1
+    assert len({r["reference"] for r in results}) == 1
+    first = results[0]
+    value = assistant.secrets.get(first["reference"])
+    assert len(value) == 32 and all(c in "0123456789abcdef" for c in value)
+    assert value not in json.dumps(results)
+    assert value not in json.dumps(assistant.evidence.read(first["run_id"]))
+    assert first["manager_address"] == "fmc.example.invalid"
+    assert assistant.prepare_registration_key("lab-fmc-1", "lab-ftd-2", "Register the FTD")["reference"] != first["reference"]
+    assert not lab.calls
+    for target, device, request in [("missing", "lab-ftd-1", "Register"),
+                                    ("lab-fmc-1", "missing", "Register"),
+                                    ("lab-fmc-1", "lab-ftd-1", "")]:
+        with pytest.raises(AssistantError):
+            assistant.prepare_registration_key(target, device, request)
+
+
 def test_incomplete_pagination_cannot_pass_verification(assistant, lab):
     def endless(request):
         if request.url.path.endswith("networks"):

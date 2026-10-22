@@ -30,6 +30,18 @@ def test_redaction_handles_tokens_nested_metadata_and_pem():
     assert redactor.clean({"code": "literal_secret_rejected"})["code"] == "literal_secret_rejected"
 
 
+def test_registration_key_does_not_replace_login_or_existing_key(assistant):
+    assistant.secrets.set("lab-fmc-1-auth", "SYNTHETIC-LOGIN-SENTINEL",
+                          device=assistant.state.device("lab-fmc-1"))
+    with pytest.raises(AssistantError) as error:
+        assistant.secrets.ensure_registration_key("lab-fmc-1-auth")
+    assert error.value.code == "registration_reference_conflict"
+    assert assistant.secrets.get("lab-fmc-1-auth") == "SYNTHETIC-LOGIN-SENTINEL"
+    assistant.secrets.set("registration-fixture", "SYNTHETIC-REGISTRATION-SENTINEL")
+    assert assistant.secrets.ensure_registration_key("registration-fixture") is False
+    assert assistant.secrets.get("registration-fixture") == "SYNTHETIC-REGISTRATION-SENTINEL"
+
+
 @pytest.mark.parametrize("command", ["configure terminal", "expert", "show version; reboot", "show version\nreboot",
                                       "show version | include x", "show running-config", "enable", "show $(id)"])
 def test_ssh_commands_cannot_mutate_or_escape(command):

@@ -32,8 +32,10 @@ allowlist. For example, manager registration uses:
 ```
 
 Secret values are resolved locally and redacted from command echoes and evidence.
-Prepare registration keys in the local secret store without exposing their values;
-use the same reference in FMC's registration request. Do not use a login password
+When a key is unspecified, use `prepare_registration_key` with the enrolled FMC
+and FTD aliases plus the current registration request. Use the returned reference
+in both SSH and FMC registration; the random key never leaves local storage.
+The tool reuses an existing key for the pair rather than rotating it on retries. Do not use a login password
 as a registration key. Each argument must be a single CLI token. Shell operators,
 control characters, expert mode, and privilege escalation are not supported.
 Commands requiring interactive confirmation are not auto-confirmed: a timeout
