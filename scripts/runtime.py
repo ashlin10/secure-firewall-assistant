@@ -147,7 +147,7 @@ def migrate_registration(home, base, uv_binary):
     dispatcher = isinstance(arguments, list) and str(base / "launcher.py") in arguments
     if server.get("url") or not (legacy or dispatcher):
         return "custom_registration_preserved"
-    headers = list(re.finditer(r"(?m)^\s*\[.+\][ \t]*(?:#.*)?$", original))
+    headers = list(re.finditer(r"(?m)^[ \t]*\[[^\r\n]+\][ \t]*(?:#[^\r\n]*)?(?=\r?$)", original))
     span = None
     for index, header in enumerate(headers):
         try:
@@ -177,7 +177,8 @@ def migrate_registration(home, base, uv_binary):
                         raise RuntimeError("Could not parse standalone MCP transport") from None
                     end = body.find("\n", end)
             body = body[:match.start()] + body[end:]
-    assignments = "\n" + "".join(f"{key} = {json.dumps(value)}\n" for key, value in desired.items())
+    newline = "\r\n" if "\r\n" in original else "\n"
+    assignments = newline + "".join(f"{key} = {json.dumps(value)}{newline}" for key, value in desired.items())
     updated = original[:span[0]] + assignments + body + original[span[1]:]
     expected = copy.deepcopy(parsed)
     expected["mcp_servers"]["secure-firewall"].update(desired)

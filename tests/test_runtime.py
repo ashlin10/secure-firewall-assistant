@@ -102,7 +102,8 @@ def test_concurrent_cold_starts_prepare_only_once(tmp_path):
 
 
 @pytest.mark.parametrize("header", ['[mcp_servers.secure-firewall]', '[mcp_servers."secure-firewall"]'])
-def test_migration_preserves_comments_env_and_custom_policies(tmp_path, header):
+@pytest.mark.parametrize("newline", ['\n', '\r\n'])
+def test_migration_preserves_comments_env_and_custom_policies(tmp_path, header, newline):
     base = tmp_path / ".codex/plugins" / runtime.NAME
     config = tmp_path / ".codex/config.toml"
     config.parent.mkdir(parents=True)
@@ -122,14 +123,17 @@ SFA_DATA_DIR = "private-fixture"
 [mcp_servers.other]
 command = "preserve-me"
 '''
-    config.write_text(original)
+    original = original.replace('\n', newline)
+    config.write_bytes(original.encode())
     expected = tomllib.loads(original)
     expected['mcp_servers']['secure-firewall'].update(runtime.stable_transport(base, 'fixture-uv'))
     assert runtime.migrate_registration(tmp_path, base, 'fixture-uv') == 'migrated'
     assert tomllib.loads(config.read_text()) == expected
     assert '# Keep this comment' in config.read_text()
     backup = next(config.parent.glob('config.sfa-backup-*'))
-    assert backup.read_text() == original
+    assert backup.read_bytes() == original.encode()
+    if newline == '\r\n':
+        assert b'\n' not in config.read_bytes().replace(b'\r\n', b'')
     assert runtime.migrate_registration(tmp_path, base, 'fixture-uv') == 'stable'
     assert len(list(config.parent.glob('config.sfa-backup-*'))) == 1
 
