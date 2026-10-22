@@ -28,8 +28,10 @@ Installation:
 1. Copies the release into
    `~/.codex/plugins/secure-firewall-assistant/releases/<version>-<digest>/`.
 2. Runs a frozen dependency installation and a harmless local health check.
-3. Rewrites the installed MCP launch entry to the absolute uv path and prepared
-   release directory. The shared archive contains no teammate-specific paths.
+3. Keeps the bundled launch command rooted at `${PLUGIN_ROOT}` and discovers
+   the local uv executable. Creates a stable standalone dispatcher and migrates
+   an existing project-managed `secure-firewall` registration automatically,
+   preserving unrelated settings and backing up the configuration.
 4. Adds/updates only this plugin's entry in
    `~/.agents/plugins/marketplace.json`, preserving other entries and backing up
    an existing catalog. It does not directly edit ChatGPT's plugin cache.
@@ -54,11 +56,35 @@ silently claim the assistant skill is installed through MCP registration alone.
 
 ## Upgrade or roll back
 
-Download and inspect a reviewed versioned release; run its installer; then
-refresh/reinstall from the marketplace and start a new chat. The installer
-retains earlier release directories so running processes and rollback remain
-available. It leaves the shared `devices.yaml` beside the release directories
-untouched.
+When the host delivers an updated plugin package through a supported marketplace
+or workspace sync, the next MCP startup prepares its runtime automatically. Users
+do not rerun the installer or edit a version-specific MCP path for each update.
+First preparation installs the locked dependencies and checks health; later starts
+reuse the ready runtime. Dependency or health-check failure stops the new startup
+and leaves the previous active runtime selected. Updates that add uncached
+dependencies require network access during preparation.
+
+The stable standalone dispatcher resolves the enabled installed plugin through
+`codex plugin list --json`, then delegates to that package's bootstrap. It uses the
+CLI's selected version, not the highest leftover cache directory. If the Codex CLI
+is unavailable, it can refresh an existing package root or use the last prepared
+runtime; it cannot discover a newly selected cache directory without the CLI.
+Multiple enabled copies of this plugin require choosing one. Custom standalone
+servers with the same name are preserved rather than overwritten.
+
+An initial upgrade from a pre-0.5.0 installation must deliver this new bootstrap
+once: run the installer and refresh the plugin, or let a supported host deliver
+the new package and launch its bundled MCP. That startup also migrates the legacy
+standalone registration. For hosts that omit bundled MCP discovery, run the
+installer once to migrate their pinned standalone registration.
+
+The installer remains available for initial setup, local ZIP distribution, and
+explicit upgrades or rollback. A source commit alone does not deliver a new
+package to other users: the configured distribution channel must sync or publish
+it. This implementation does not create or configure a workspace marketplace.
+Start a new chat, or restart the desktop host if it retains an older MCP process.
+Earlier release directories remain available for running processes and rollback.
+The shared `devices.yaml` beside the release directories is unchanged.
 
 To select a previous successfully installed release:
 
@@ -97,11 +123,12 @@ bundled MCP server was discovered. Check `codex mcp list --json` and inspect onl
 the secure-firewall entry. This machine loaded portable plugin skills while
 omitting the bundled server, including after adding compatibility manifests.
 
-The verified local workaround is explicit registration using the installed
-release directory printed by setup. Substitute that exact directory below:
+The installer now migrates an existing project-managed registration to a stable
+dispatcher. If there is no standalone entry and your host needs the workaround,
+add one once using the stable launcher path printed by the installer:
 
 ```sh
-codex mcp add secure-firewall -- /absolute/path/to/uv run --project /installed/release/directory --frozen --no-dev --offline secure-firewall-assistant serve
+codex mcp add secure-firewall -- /absolute/path/to/uv run --no-project --python 3.12 /user/plugin/base/launcher.py --active
 ```
 
 Keep the installed plugin enabled for its skill. This additional local server
@@ -112,9 +139,10 @@ response from an external test process. Confirm the form actually renders before
 claiming enrollment succeeded. The standard MCP status `auth_status: unsupported`
 for this local stdio server refers to MCP OAuth, not to the FMC password store.
 
-This registration pins a release path. After an upgrade, repeat it with the new
-installed release directory. If a future desktop version discovers the bundled
-server automatically, remove only the duplicate standalone registration with
+This registration keeps the same launch path across upgrades. The dispatcher
+prepares and selects the installed plugin runtime on startup. If your desktop
+version discovers the bundled server automatically, remove only the duplicate
+standalone registration with
 `codex mcp remove secure-firewall`; keep the plugin installed.
 
 ## Shared schemas and format-2 inventory (0.4.0)

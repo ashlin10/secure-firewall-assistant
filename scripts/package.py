@@ -50,7 +50,9 @@ def validate(root=ROOT):
     assert names and len(names) == len(set(names))
     for transport in json.loads((root / "mcp.json").read_text())["mcpServers"].values():
         assert transport["type"] == "stdio" and transport["command"] == "uv"
-        assert "${PLUGIN_ROOT}" in transport["args"] and "--offline" in transport["args"]
+        assert "${PLUGIN_ROOT}" in transport["args"] and "--no-project" in transport["args"]
+        assert "${PLUGIN_ROOT}/scripts/runtime.py" in transport["args"]
+        assert "--source" in transport["args"]
     return version
 
 

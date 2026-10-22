@@ -1,43 +1,20 @@
 """Install/update a private local plugin without touching inventory or credentials."""
 import argparse
-import hashlib
+import importlib.util
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-NAME = "secure-firewall-assistant"
-EXCLUDED = {".git", ".venv", ".pytest_cache", ".ruff_cache", "__pycache__", "dist", "build", ".github", "tests",
-            "devices.yaml", "devices.yaml.lock", ".sfa-devices-*.tmp", ".sfa-devices-*.backup"}
-
-
-def write_json(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp = tempfile.mkstemp(dir=path.parent, prefix=".sfa-")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as out:
-            json.dump(value, out, indent=2)
-            out.write("\n")
-        os.replace(temp, path)
-    finally:
-        if os.path.exists(temp):
-            os.unlink(temp)
-
-
-def source_digest(source):
-    digest = hashlib.sha256()
-    for file in sorted(source.rglob("*")):
-        rel = file.relative_to(source)
-        if (file.is_file() and not any(p in EXCLUDED for p in rel.parts) and
-                not file.name.startswith(".") and not file.name.startswith(".sfa-devices-")):
-            digest.update(rel.as_posix().encode())
-            digest.update(file.read_bytes())
-    return digest.hexdigest()
+SPEC = importlib.util.spec_from_file_location("sfa_runtime", Path(__file__).with_name("runtime.py"))
+runtime = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(runtime)
+NAME = runtime.NAME
+write_json = runtime.write_json
 
 
 def register(home, destination):
@@ -78,48 +55,20 @@ def register(home, destination):
 def install(source: Path, home: Path | None = None, uv_binary: str | None = None, runner=subprocess.run):
     home = (home or Path.home()).resolve()
     source = source.resolve()
-    manifest = json.loads((source / "plugin.json").read_text(encoding="utf-8"))
-    if manifest.get("name") != NAME or not re.fullmatch(r"\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?", manifest.get("version", "")):
-        raise RuntimeError("Unrecognized plugin identity or version.")
-    uv_binary = uv_binary or shutil.which("uv")
-    if not uv_binary:
-        raise RuntimeError("Install uv from https://docs.astral.sh/uv/getting-started/installation/ and reopen your terminal.")
-    uv_binary = str(Path(uv_binary).resolve())
-    version = manifest["version"]
-    destination = home / ".codex/plugins" / NAME / "releases" / f"{version}-{source_digest(source)[:12]}"
-    if (source / "installation.json").exists():
-        destination = source
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if not destination.exists():
-        shutil.copytree(source, destination, ignore=shutil.ignore_patterns(*EXCLUDED, ".DS_Store", ".coverage"))
-    # The host may copy the manifest into its cache. Start the prepared, immutable
-    # release directory rather than expecting dependencies to survive that copy.
-    mcp = json.loads((destination / "mcp.json").read_text(encoding="utf-8"))
-    transport = mcp["mcpServers"]["secure-firewall"]
-    transport["command"] = uv_binary
-    transport["args"] = ["run", "--project", str(destination), "--frozen", "--no-dev", "--offline",
-                         "secure-firewall-assistant", "serve"]
-    transport["cwd"] = str(destination)
+    result = runtime.prepare(source, home, uv_binary, runner, allow_downgrade=True, package_root_is_release=True)
+    destination = Path(result["release_directory"])
+    # Keep the launch root portable: a host-refreshed package bootstraps itself.
+    # Only executable discovery is local to this prepared marketplace copy.
+    uv_binary = str(Path(uv_binary or shutil.which("uv")).resolve())
+    mcp = json.loads((source / "mcp.json").read_text(encoding="utf-8"))
+    mcp["mcpServers"]["secure-firewall"]["command"] = uv_binary
     write_json(destination / "mcp.json", mcp)
-    # Older local desktop loaders still require the compatibility launch file.
-    # Derive it from the rewritten portable launch entry so both use this release.
-    legacy = json.loads(json.dumps(mcp["mcpServers"]))
-    for value in legacy.values():
-        value.pop("type", None)
+    legacy = {name: {key: value for key, value in fields.items() if key != "type"}
+              for name, fields in mcp["mcpServers"].items()}
     write_json(destination / ".mcp.json", {"mcpServers": legacy})
-    # Installation and health checks do not modify or return credential values.
-    runner([uv_binary, "sync", "--project", str(destination), "--frozen", "--no-dev"], check=True)
-    environment = {**os.environ, "SFA_DATA_DIR": str(destination / ".installation-check")}
-    try:
-        runner([uv_binary, "run", "--project", str(destination), "--frozen", "--no-dev", "--offline",
-                "secure-firewall-assistant", "health"], check=True, env=environment, stdout=subprocess.DEVNULL)
-    finally:
-        shutil.rmtree(destination / ".installation-check", ignore_errors=True)
-    write_json(destination / "installation.json", {"version": version, "source_sha256": source_digest(source),
-                                                  "installed_utc": datetime.now(timezone.utc).isoformat()})
     marketplace = register(home, destination)
-    return {"version": version, "release_directory": str(destination), "marketplace": str(marketplace),
-            "next_step": "Restart ChatGPT desktop, open Plugins, choose your personal marketplace, install/refresh Secure Firewall Assistant, then start a new local Work chat.",
+    return {**result, "marketplace": str(marketplace),
+            "next_step": "Refresh the plugin and start a new local chat. Restart the desktop host if it retains old tool definitions.",
             "inventory_and_credentials_changed": False}
 
 
@@ -134,8 +83,10 @@ def main():
             destination = Path.home() / ".codex/plugins" / NAME / "releases" / args.rollback
             if not (destination / "installation.json").is_file():
                 raise RuntimeError("That release has not completed installation.")
+            selected = runtime.prepare(destination, allow_downgrade=True)
             register(Path.home(), destination)
-            result = {"selected_release": str(destination), "next_step": "Restart ChatGPT and refresh/reinstall the plugin from the marketplace."}
+            result = {**selected, "marketplace_release": str(destination),
+                      "next_step": "Refresh the plugin and restart the desktop host to complete rollback."}
         else:
             result = install(Path(__file__).resolve().parents[1])
         print(json.dumps(result, indent=2))

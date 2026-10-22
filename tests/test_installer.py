@@ -19,6 +19,8 @@ def prepare_source(tmp_path, version="0.1.0"):
     (source / "plugin.json").write_text(json.dumps(manifest))
     (source / "mcp.json").write_bytes((ROOT / "mcp.json").read_bytes())
     (source / "uv.lock").write_text("fixture lockfile")
+    (source / "scripts").mkdir()
+    (source / "scripts/runtime.py").write_bytes((ROOT / "scripts/runtime.py").read_bytes())
     return source
 
 
@@ -48,7 +50,8 @@ def test_install_upgrade_preserves_catalog_and_private_files(tmp_path):
     assert private.read_text() == "PRIVATE-INVENTORY-SENTINEL"
     transport = json.loads((Path(second["release_directory"]) / "mcp.json").read_text())["mcpServers"]["secure-firewall"]
     assert transport["command"] == str(Path("/fixture/uv").resolve())
-    assert second["release_directory"] in transport["args"]
+    assert "${PLUGIN_ROOT}/scripts/runtime.py" in transport["args"]
+    assert second["release_directory"] not in transport["args"]
     legacy = json.loads((Path(second["release_directory"]) / ".mcp.json").read_text())["mcpServers"]["secure-firewall"]
     assert legacy == {k: v for k, v in transport.items() if k != "type"}
     assert len(list(marketplace.parent.glob("marketplace.backup-*"))) == 2

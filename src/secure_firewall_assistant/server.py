@@ -27,7 +27,7 @@ use execute_configuration_batch for independent creates, never guess bulk suppor
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.4.1", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.5.0", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)

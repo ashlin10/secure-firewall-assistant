@@ -1,3 +1,11 @@
+# 0.5.0 — 2026-10-22
+
+- Bootstrap from the installed plugin root and prepare locked runtimes automatically on startup after a package update.
+- Add a stable standalone MCP dispatcher that resolves the installed plugin through Codex and activates its prepared runtime.
+- Migrate legacy standalone MCP transport fields automatically, preserving other configuration and saving a local backup.
+- Serialize preparation, verify health before activation, reuse ready runtimes offline, and retain the previous selection after failed preparation.
+- Report the actual package version in assistant health.
+
 # 0.4.1 — 2026-10-22
 
 - Open enrollment in a dedicated form that never returns existing inventory and only adds new devices.

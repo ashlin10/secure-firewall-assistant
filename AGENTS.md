@@ -4,9 +4,10 @@
   local installation, commits, and pushes without repeated confirmation.
 - Whenever this project changes, complete the release workflow before reporting
   completion: run appropriate checks, install the current source with
-  `scripts/install.py`, refresh the local plugin, and update the standalone
-  `secure-firewall` MCP registration to the exact release directory returned by
-  the installer. Never leave MCP pinned to an older release.
+  `scripts/install.py`, refresh the local plugin, and verify that the standalone
+  `secure-firewall` MCP registration uses the stable dispatcher created by the
+  installer. Verify that its active runtime resolves to the exact release
+  returned by the installer. Never leave MCP pinned to an older release.
 - Verify the registered server's tools and relevant MCP App resource through
   stdio. Distinguish that verification from rendering in the current desktop
   session; report when a host restart is still required.

@@ -5,8 +5,12 @@ stdio. The helper reaches FMC HTTPS and optional FTD SSH from the user's machine
 The local helper has no inbound listener. A shared read-only HTTP MCP service
 on the internal schema host distributes versioned API catalogs. Device access
 continues from the user’s machine; no device credentials are sent to that service.
-The installed launch entry uses a durable prepared release so the desktop's
-plugin cache does not need to contain a portable virtual environment.
+The bundled launch entry bootstraps from `${PLUGIN_ROOT}` into a durable prepared
+release, so the desktop plugin cache never needs a portable virtual environment.
+A standard-library bootstrap installs locked dependencies, checks health, and
+atomically selects a ready runtime. A stable standalone dispatcher uses the
+installed plugin version reported by the Codex CLI and needs no per-release path
+edits. Running MCP processes keep their original runtime until restarted.
 
 ```mermaid
 flowchart TD

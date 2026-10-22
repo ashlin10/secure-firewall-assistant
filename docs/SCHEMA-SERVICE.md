@@ -21,7 +21,9 @@ standalone schema-server entry in the client's MCP settings. The local helper
 automatically reaches the shared service when it needs a schema; users need lab
 network access. A separately added `secure-firewall` client registration is a
 local development convenience, not a requirement imposed on plugin users.
-After updating the plugin, refresh it and start a new local chat; an existing
+The local bootstrap prepares a delivered package update on the next MCP start;
+its stable standalone dispatcher follows the installed plugin version.
+After updating the plugin, start a new local chat; an existing
 desktop process may retain old tool/resource definitions until restarted.
 
 The supplied, maintained schema is identified as FMC **10.5.0.0, revision r1**,

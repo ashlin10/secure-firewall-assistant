@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar, copy_context
 from threading import Event
 
+from . import __version__
 from .catalog import Catalog
 from .errors import AssistantError
 from .evidence import Evidence, compare
@@ -80,7 +81,7 @@ class Assistant:
             client.close()
 
     def health(self) -> dict:
-        return {"version": "0.4.0", "devices_enrolled": len(self.state.aliases()),
+        return {"version": __version__, "devices_enrolled": len(self.state.aliases()),
                 "schema": self._bootstrap_catalog.provenance, "network_access_tested": False,
                 "schema_service": {"url": getattr(self.catalog_provider, "url", None), "cache_directory": str(self.state.data / "schema-cache"),
                                    "missing_version_policy": "latest", "refresh_seconds": 60},

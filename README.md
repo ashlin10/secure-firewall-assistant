@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.4.1
+# Secure Firewall Assistant 0.5.0
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
@@ -15,7 +15,8 @@ required. Work/model usage follows your ChatGPT plan and workspace settings.
 1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) through
    your approved software channel. It installs the pinned Python 3.12 runtime
    and locked dependencies during setup. Setup needs internet access; normal
-   helper startup uses the prepared environment with offline dependency resolution.
+   helper startup reuses the prepared environment. Updated packages may need
+   internet once to install newly required locked dependencies.
 2. Extract the versioned release ZIP into a folder you own.
 3. On macOS, run `./Install.command` in Terminal. On Windows, run `./Install.ps1`
    in PowerShell. Follow organizational script/signing policy; do not disable it.
@@ -27,8 +28,10 @@ required. Work/model usage follows your ChatGPT plan and workspace settings.
 Use the **release directory printed by the installer** for management commands.
 The installer creates a durable per-user release and a personal marketplace
 entry. It preserves all other marketplace entries, backups, private inventory,
-and credential entries. Upgrading means installing a new reviewed release and
-refreshing/reinstalling it in the Plugins interface. See [INSTALLATION.md](docs/INSTALLATION.md).
+and credential entries. For local ZIP distribution, run the reviewed release’s
+installer and refresh it in the Plugins interface. Once this bootstrap is installed, host-delivered
+package updates prepare their runtime on the next MCP start; users do not rerun
+the installer or change standalone MCP paths for each update. See [INSTALLATION.md](docs/INSTALLATION.md).
 
 Examples after enrollment:
 

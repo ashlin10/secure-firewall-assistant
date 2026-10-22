@@ -4,7 +4,15 @@
     "secure-firewall": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "--project", "${PLUGIN_ROOT}", "--frozen", "--no-dev", "--offline", "secure-firewall-assistant", "serve"],
+      "args": [
+        "run",
+        "--no-project",
+        "--python",
+        "3.12",
+        "${PLUGIN_ROOT}/scripts/runtime.py",
+        "--source",
+        "${PLUGIN_ROOT}"
+      ],
       "cwd": "${PLUGIN_ROOT}"
     }
   }
