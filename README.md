@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.4.0
+# Secure Firewall Assistant 0.4.1
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
@@ -6,7 +6,8 @@ Lab HTTPS connections accept self-signed certificates by default. Set `verify_ss
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and
-a local YAML credential file. No hosted server, tunnel, or OpenAI API key is
+a local YAML credential file. The local helper retrieves API catalogs from the
+shared schema MCP service on the lab network. No tunnel or OpenAI API key is
 required. Work/model usage follows your ChatGPT plan and workspace settings.
 
 ## Start here
@@ -20,7 +21,7 @@ required. Work/model usage follows your ChatGPT plan and workspace settings.
    in PowerShell. Follow organizational script/signing policy; do not disable it.
 4. Restart ChatGPT desktop. Open **Plugins**, select your personal marketplace,
    install **Secure Firewall Assistant**, and start a new **local Work** chat.
-5. Ask “Open device inventory” to edit device details, usernames, and passwords, or delete devices using the trash icon. Saving stores credentials in clear text under each device in local YAML. See [ENROLLMENT.md](docs/ENROLLMENT.md).
+5. Ask “Enrol devices” to add new devices without showing existing inventory. Ask “Open device inventory” to edit device details, usernames, and passwords, or delete devices using the trash icon. Saving stores credentials in clear text under each device in local YAML. See [ENROLLMENT.md](docs/ENROLLMENT.md).
 6. Mention the plugin and request a read-only check first.
 
 Use the **release directory printed by the installer** for management commands.

@@ -17,6 +17,7 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
 <script>
 (() => {
   'use strict';
+  const enrollmentOnly=false;
   const el=id=>document.getElementById(id);
   const send=(method,params,id)=>window.parent.postMessage({jsonrpc:'2.0',method,params,...(id===undefined?{}:{id})},'*');
   const status=(text,state='info')=>{el('status').textContent=text;el('status').dataset.state=state};
@@ -58,9 +59,9 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
   }
   function accept(result){
     const value=data(result);
-    if(loaded || value.status!=='edit_device_inventory')return;
-    loaded=true;for(const row of value.devices||[]){savedNames.add(row.device_name);addRow(row)}
-    if(!rows.length)addRow();el('form').hidden=false;status('Edit device details, then save the inventory.');resize();
+    if(loaded || value.status!==(enrollmentOnly?'enroll_devices':'edit_device_inventory'))return;
+    loaded=true;for(const row of value.devices||[]){if(!enrollmentOnly)savedNames.add(row.device_name);addRow(row)}
+    if(!rows.length)addRow();el('form').hidden=false;status(enrollmentOnly?'Enter new device details, then save.':'Edit device details, then save the inventory.');resize();
   }
   function busy(value){
     pending=value;el('save').disabled=value;el('add').disabled=value;
@@ -72,7 +73,7 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
     const message=event.data;
     if(message.id===1 && message.result && !initialized){
       initialized=true;send('ui/notifications/initialized',{});
-      if(!loaded)send('tools/call',{name:'device_inventory',arguments:{}},10);
+      if(!loaded)send('tools/call',{name:enrollmentOnly?'start_enrollment':'device_inventory',arguments:{}},10);
     }
     if(message.id===10){
       const value=data(message.result);
@@ -85,6 +86,10 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
         savedNames=new Set((value.devices||rows.map(row=>({device_name:row.device_name.value.trim()}))).map(row=>row.device_name));deletedNames.clear();
         for(const row of rows)rowNames.set(row,row.device_name.value.trim());
         for(const row of rows){if(row.password.value)row.password.placeholder='Saved password (leave blank to keep)';row.password.value=''}
+        if(enrollmentOnly){
+          for(const group of [...el('devices').children])group.remove();
+          rows=[];savedNames.clear();addRow();
+        }
         status('Device inventory saved to devices.yaml.','success');
         send('ui/update-model-context',{content:[{type:'text',text:'Device inventory saved to local devices.yaml. No device connection was attempted.'}]},12);
       }else status(value.error?.message||'Could not save inventory. Check the details and retry.','error');
@@ -99,10 +104,10 @@ fieldset{border:1px solid var(--border);border-radius:10px;padding:16px;margin:1
     busy(true);status('Saving inventory…');
     const names=new Set(devices.map(row=>row.device_name));
     const deleted_devices=[...deletedNames].filter(name=>!names.has(name));
-    send('tools/call',{name:'save_device_inventory',arguments:{devices,deleted_devices}},11);
+    send('tools/call',{name:'save_device_inventory',arguments:{devices,deleted_devices,...(enrollmentOnly?{new_only:true}:{})}},11);
     timer=setTimeout(()=>{busy(false);status('Save status is unknown. Reopen inventory to check saved values before retrying.','error')},20000);
   });
-  send('ui/initialize',{appInfo:{name:'Device inventory',version:'0.4.0'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
+  send('ui/initialize',{appInfo:{name:'Device inventory',version:'0.4.1'},appCapabilities:{},protocolVersion:'2026-01-26'},1);
   const initial=window.openai?.toolResponseMetadata;
   if(initial)accept(initial.call_tool_result||initial.mcp_tool_result||initial);
 })();

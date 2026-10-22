@@ -2,6 +2,7 @@ import asyncio
 import base64
 import gzip
 import json
+import os
 
 import httpx
 import pytest
@@ -41,7 +42,8 @@ def test_exact_numeric_latest_and_revision_immutability(tmp_path):
     assert value.resolve('10.5')['revision'] == 'r2'
     assert len(value.versions()) == 3
     assert tmp_path.stat().st_mode & 0o777 == original_mode
-    assert (tmp_path / 'index.json').stat().st_mode & 0o777 == 0o644
+    if os.name != 'nt':
+        assert (tmp_path / 'index.json').stat().st_mode & 0o777 == 0o644
 
 
 def test_remote_refresh_cache_integrity_and_no_device_payloads(tmp_path):

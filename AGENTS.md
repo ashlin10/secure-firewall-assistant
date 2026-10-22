@@ -19,3 +19,11 @@
   do not force-push. Report any installation or push failure explicitly.
 - An explicit user request to keep work local, uncommitted, or unpushed overrides
   this default workflow for that request.
+- After every remote schema MCP code, service-unit, or published-schema change,
+  run `scripts/sync_schema_repository.py` and verify its push to
+  `git@wwwin-github.cisco.com:aleroyds/secure-firewall-schema-service.git`.
+  This separate repository must contain the deployed source, actual service
+  unit, full registry revision history, and file checksums. Do not report a
+  remote change complete until its snapshot is pushed. The main push script
+  also runs this synchronization. Use existing admin SSH authentication;
+  never commit credentials or copy virtual environments, logs, or device data.

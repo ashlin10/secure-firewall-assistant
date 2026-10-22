@@ -1,5 +1,13 @@
 # Device inventory
 
+## Enrol new devices
+
+Ask “Enrol devices”. `start_enrollment` opens a dedicated form with only new
+rows. Existing devices and their details are never included in its initial
+response or save response. Select **Save new devices** to add the entered rows.
+An existing name is rejected without overwriting it; enrollment cannot delete
+devices. After saving, the form clears for another new device.
+
 ## Edit inside ChatGPT or Codex
 
 Ask “Open device inventory” or use the plugin app entrypoint. The embedded form
@@ -26,7 +34,8 @@ explicitly named for deletion. Ports must be integers from 1 through 65535 and
 device names must be unique. Saving does not contact devices or deploy.
 
 The app uses the host MCP tool bridge, with no local listener or remote assets.
-`device_inventory` opens it; `start_enrollment` prefills a supplied name/address.
+`device_inventory` opens the inventory editor; `start_enrollment` opens the
+separate new-device form and can prefill a supplied name/address.
 The app-only `save_device_inventory` tool validates all rows and deletion names
 before writing. Save errors leave the form editable. After a timeout, reopen the
 inventory to inspect saved values before retrying. Refresh the plugin and restart

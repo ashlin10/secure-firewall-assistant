@@ -1,3 +1,10 @@
+# 0.4.1 — 2026-10-22
+
+- Open enrollment in a dedicated form that never returns existing inventory and only adds new devices.
+- Reject enrollment name collisions and deletions before writing, including concurrent saves.
+- Restrict the schema registry POSIX permission assertion to platforms that support it.
+- Snapshot deployed schema service source, installed unit, and complete registry history to a separate Cisco repository during the release push workflow.
+
 # 0.4.0 — 2026-10-22
 
 - Add a shared read-only HTTP MCP schema service with administrative version/revision publishing.

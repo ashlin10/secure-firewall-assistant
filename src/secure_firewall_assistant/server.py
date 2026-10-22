@@ -27,7 +27,7 @@ use execute_configuration_batch for independent creates, never guess bulk suppor
 def build_server(assistant: Assistant | None = None):
     assistant = assistant or Assistant()
     atexit.register(assistant.close)
-    server = MCPServer("Secure Firewall Assistant", version="0.4.0", instructions=INSTRUCTIONS,
+    server = MCPServer("Secure Firewall Assistant", version="0.4.1", instructions=INSTRUCTIONS,
                        log_level="ERROR", debug=False)
     from .enrollment_ui import MIME, EnrollmentUI
     enrollment = EnrollmentUI(assistant.state, assistant.secrets)
@@ -36,6 +36,11 @@ def build_server(assistant: Assistant | None = None):
     @server.resource(enrollment.uri, mime_type=MIME, meta=enrollment.resource_meta)
     def enrollment_resource() -> str:
         return enrollment.html()
+
+    @server.resource(enrollment.enrollment_uri, mime_type=MIME, meta={
+        **enrollment.resource_meta, "openai/widgetDescription": "Enroll new devices without displaying existing inventory."})
+    def add_devices_resource() -> str:
+        return enrollment.html(new_only=True)
     read_annotation = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
     write_annotation = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True)
 
@@ -85,14 +90,15 @@ def build_server(assistant: Assistant | None = None):
     def device_inventory() -> CallToolResult:
         return enrollment.start()
 
-    @expose("start_enrollment", "Compatibility entrypoint for the device inventory form. Only local inventory metadata is saved.", meta=inventory_meta)
+    @expose("start_enrollment", "Open a form to add NEW devices only. Existing inventory is never displayed. Saves local inventory without contacting devices.",
+            meta={"ui": {"resourceUri": enrollment.enrollment_uri}, "openai/outputTemplate": enrollment.enrollment_uri})
     def enroll(kind: Literal["fmc", "ftd", "endpoints", "traffic_generators", "routers", "switches"] = "fmc", alias: str = "", address: str = "", username: str = "",
                domain: str | None = None, confirm_details: bool = False) -> CallToolResult:
-        return enrollment.start(alias, address, kind)
+        return enrollment.start(alias, address, kind, new_only=True)
 
     @expose("save_device_inventory", "Save device details and per-device account fields from the inventory app. Blank passwords preserve existing values. Explicit deleted_devices removes local entries. Never contacts devices.", write=True, meta={"ui": {"visibility": ["app"]}})
-    def save_device_inventory(devices: list[dict], deleted_devices: list[str] | None = None) -> dict:
-        return enrollment.save(devices, deleted_devices)
+    def save_device_inventory(devices: list[dict], deleted_devices: list[str] | None = None, new_only: bool = False) -> dict:
+        return enrollment.save(devices, deleted_devices, new_only=new_only)
 
     @expose("connect_fmc", "Authenticate internally and inspect the enrolled FMC domain and software version.")
     def connect(target: str) -> dict:

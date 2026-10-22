@@ -50,9 +50,16 @@ def main():
     for remote in REMOTES:
         options = github_options if remote == "github" else []
         git(*options, "push", remote, "main")
+        local = git("rev-parse", "HEAD", capture=True)
+        observed = git(*options, "ls-remote", remote, "refs/heads/main", capture=True).split()[0]
+        if observed != local:
+            raise SystemExit(f"Remote {remote} tip does not match the local commit.")
         if args.release_tag:
             git(*options, "push", remote, "refs/tags/" + args.release_tag)
         print(f"Updated {remote}.")
+    # The deployed schema source and every published revision have their own
+    # Cisco repository. A failed backup makes the release workflow fail visibly.
+    subprocess.run([sys.executable, str(ROOT / "scripts/sync_schema_repository.py")], check=True)
 
 
 if __name__ == "__main__":

@@ -83,7 +83,8 @@ def test_mcp_inventory_roundtrip_without_device_connections(assistant, lab):
             assert saver.meta['ui']['visibility'] == ['app']
             result = await client.call_tool('start_enrollment', {'alias':'fixture','address':'https://example.invalid:8443'})
             public = json.loads(result.content[0].text)
-            assert public['status'] == 'edit_device_inventory'
+            assert public['status'] == 'enroll_devices'
+            assert len(public['devices']) == 1
             assert public['devices'][-1] == {**row('fixture', 'example.invalid', 8443, 22), 'username':'', 'has_account':False, 'device_type':'fmc'}
             result = await client.call_tool('save_device_inventory', {'devices':[row()]})
             assert 'inventory_saved' in result.content[0].text
@@ -91,13 +92,47 @@ def test_mcp_inventory_roundtrip_without_device_connections(assistant, lab):
     asyncio.run(run())
 
 
-def test_card_bridge_flow():
+@pytest.mark.parametrize('mode', ['inventory', 'enrollment'])
+def test_card_bridge_flow(mode):
     node = shutil.which('node')
     if not node:
         pytest.skip('Node needed for component test')
     root = Path(__file__).resolve().parents[1]
     subprocess.run([node, str(root / 'tests/card_flow.mjs'),
-                    str(root / 'src/secure_firewall_assistant/enrollment_card.html')], check=True)
+                    str(root / 'src/secure_firewall_assistant/enrollment_card.html'), mode], check=True)
+
+
+def test_new_enrollment_hides_inventory_and_only_adds(assistant, lab):
+    ui = EnrollmentUI(assistant.state, assistant.secrets)
+    assert ui.start(new_only=True).structured_content['devices'] == []
+    before = assistant.state.device('lab-fmc-1')
+    result = ui.save([row()], new_only=True)
+    assert result['devices'] == [{'device_name': 'new-device'}]
+    assert 'lab-fmc-1' not in json.dumps(result)
+    assert assistant.state.device('lab-fmc-1') == before
+    assert ui.start(new_only=True).structured_content['devices'] == []
+    assert lab.calls == []
+
+
+@pytest.mark.parametrize('devices,deleted', [
+    ([row('lab-fmc-1')], []), ([row(), row('lab-fmc-1')], []),
+    ([row()], ['lab-fmc-1']), ([], []),
+])
+def test_new_enrollment_rejects_collisions_and_deletions_without_writing(assistant, devices, deleted):
+    before = assistant.state.device_file.read_bytes()
+    with pytest.raises(AssistantError):
+        EnrollmentUI(assistant.state, assistant.secrets).save(devices, deleted, new_only=True)
+    assert assistant.state.device_file.read_bytes() == before
+
+
+def test_new_enrollment_rechecks_names_after_form_open(assistant):
+    ui = EnrollmentUI(assistant.state, assistant.secrets)
+    ui.start(new_only=True)
+    ui.save([row()], new_only=True)
+    before = assistant.state.device_file.read_bytes()
+    with pytest.raises(AssistantError, match='already enrolled'):
+        ui.save([row(host='changed.invalid')], new_only=True)
+    assert assistant.state.device_file.read_bytes() == before
 
 
 def test_password_save_preserve_rotate_and_response_privacy(assistant, lab):

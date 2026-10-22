@@ -15,6 +15,15 @@ contacting an FMC. No separate remote MCP registration is required in Codex:
 the local helper is the client of the shared MCP service. Other MCP clients may
 also connect directly to the shared endpoint for schema discovery.
 
+Installing/enabling the plugin loads its bundled `secure-firewall` stdio server
+through `mcp.json` (or `.mcp.json` for compatibility). It does not create a second
+standalone schema-server entry in the client's MCP settings. The local helper
+automatically reaches the shared service when it needs a schema; users need lab
+network access. A separately added `secure-firewall` client registration is a
+local development convenience, not a requirement imposed on plugin users.
+After updating the plugin, refresh it and start a new local chat; an existing
+desktop process may retain old tool/resource definitions until restarted.
+
 The supplied, maintained schema is identified as FMC **10.5.0.0, revision r1**,
 based on the project owner's version identification. This does not assert live
 compatibility with every operation or FMC build. Numeric versions are normalized
@@ -73,3 +82,30 @@ Use `systemctl status secure-firewall-schemas` and
 `journalctl -u secure-firewall-schemas` for operational checks. Choose a free port
 when installing another service and update the endpoint and allowed-host list.
 No existing service on this machine is replaced.
+
+## Separate Cisco source and registry repository
+
+The deployed service is backed up at
+[aleroyds/secure-firewall-schema-service](https://wwwin-github.cisco.com/aleroyds/secure-firewall-schema-service).
+`runtime/` captures deployed source and dependency locks, `deployment/` captures
+the installed systemd unit, and `registry/` stores every schema package, active
+index, and immutable revision history. `snapshot.json` records each file's SHA-256.
+Credentials, device inventory, evidence, logs, and virtual environments are excluded.
+
+After **every** code deployment, service-unit change, or schema publication, run:
+
+```sh
+uv run --offline python scripts/sync_schema_repository.py
+```
+
+This uses existing admin SSH authentication, validates all registry checksums,
+updates the separate checkout, commits changes, pushes without rewriting history,
+and verifies the remote commit. `scripts/push_repositories.py` runs it after both
+plugin repository pushes and reports a failure if synchronization fails. Changes
+made directly on the server also require this command before being considered
+complete; this is a release step, not a background file watcher.
+
+For an already authenticated SSH control connection, set the local environment
+variable `SFA_SCHEMA_SSH_CONTROL_PATH` or pass `--control-path`. Paths and
+authentication details stay local. A local Git setting
+`secureFirewall.schemaSshControlPath` can persist the socket choice for this checkout.

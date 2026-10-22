@@ -48,6 +48,7 @@ class EnrollmentUI:
     def __init__(self, state, store):
         self.state, self.store = state, store
         self.uri = "ui://secure-firewall/device-inventory/v1.html"
+        self.enrollment_uri = "ui://secure-firewall/add-devices/v1.html"
 
     def close(self):
         pass
@@ -79,24 +80,28 @@ class EnrollmentUI:
         return bool(stored["devices"].get(name, {}).get("password") or
                     stored.get("credentials", {}).get(reference) or stored.get("secrets", {}).get(reference))
 
-    def start(self, alias="", address="", kind="fmc"):
-        rows = self.rows()
+    def start(self, alias="", address="", kind="fmc", *, new_only=False):
+        rows = [] if new_only else self.rows()
         if alias and not any(row["device_name"] == alias for row in rows):
             origin = urlsplit(address) if "://" in address else None
             rows.append({"device_name": alias, "device_type": kind, "hostname": (origin.hostname or "") if origin else address,
                          "https_port": (origin.port or 443) if origin else 443, "ssh_port": 22,
                          "username": "", "has_account": False})
-        public = {"status": "edit_device_inventory", "devices": rows,
-                  "next_step": "Edit the device inventory form and select Save inventory. This only updates devices.yaml."}
+        public = {"status": "enroll_devices" if new_only else "edit_device_inventory", "devices": rows,
+                  "next_step": ("Add new devices and select Save new devices." if new_only else
+                                "Edit the device inventory form and select Save inventory.") +
+                               " This only updates devices.yaml."}
         return CallToolResult(content=[TextContent(type="text", text=json.dumps(public))], structured_content=public)
 
-    def save(self, devices, deleted_devices=None):
+    def save(self, devices, deleted_devices=None, *, new_only=False):
         if not isinstance(devices, list) or not 0 <= len(devices) <= 1000:
             raise AssistantError("invalid_inventory", "Submit up to 1000 devices.")
         rows = [validate_row(row) for row in devices]
         if len({row["device_name"] for row in rows}) != len(rows):
             raise AssistantError("invalid_inventory", "Device names must be unique.")
         deleted_devices = [] if deleted_devices is None else deleted_devices
+        if new_only and (deleted_devices or not rows):
+            raise AssistantError("invalid_inventory", "Enrollment requires new devices and cannot delete saved devices.")
         if (not isinstance(deleted_devices, list) or len(deleted_devices) > 1000 or
                 any(not isinstance(name, str) or not ALIAS.fullmatch(name) for name in deleted_devices) or
                 set(deleted_devices) & {row["device_name"] for row in rows}):
@@ -106,6 +111,8 @@ class EnrollmentUI:
                 FileLock(str(self.state.config / "inventory.lock"), timeout=15):
             stored = self.store._read()
             existing = self.state.inventory()["devices"]
+            if new_only and any(row["device_name"] in existing or row["device_name"] in stored["devices"] for row in rows):
+                raise AssistantError("device_exists", "A device name is already enrolled. Choose a new name or open device inventory to edit it.")
             # Bring legacy metadata into YAML before migrating its credential references.
             for name, device in existing.items():
                 stored["devices"].setdefault(name, device.copy())
@@ -142,8 +149,14 @@ class EnrollmentUI:
                 if legacy_before is not None:
                     atomic_json(self.state.inventory_path, legacy_before)
                 raise
-        return {"ok": True, "status": "inventory_saved", "devices": self.rows(),
+        return {"ok": True, "status": "inventory_saved", "devices":
+                ([{"device_name": row["device_name"]} for row in rows] if new_only else self.rows()),
                 "message": "Device inventory saved to devices.yaml."}
 
-    def html(self):
-        return Path(__file__).with_name("enrollment_card.html").read_text(encoding="utf-8")
+    def html(self, *, new_only=False):
+        html = Path(__file__).with_name("enrollment_card.html").read_text(encoding="utf-8")
+        if new_only:
+            html = html.replace("const enrollmentOnly=false;", "const enrollmentOnly=true;")
+            html = html.replace("Device inventory", "Add devices").replace("Save inventory", "Save new devices")
+            html = html.replace("Loading device inventory…", "Loading enrollment form…")
+        return html

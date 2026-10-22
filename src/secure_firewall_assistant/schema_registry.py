@@ -195,7 +195,7 @@ class RemoteCatalogProvider:
             source = "remote_mcp"
             try:
                 self._rpc("initialize", {"protocolVersion": "2025-11-25", "capabilities": {},
-                          "clientInfo": {"name": "secure-firewall-local", "version": "0.4.0"}}, 1)
+                          "clientInfo": {"name": "secure-firewall-local", "version": "0.4.1"}}, 1)
                 result = self._rpc("tools/call", {"name": "get_schema_package", "arguments": {"fmc_version": fmc_version}}, 2)
                 if result.get("isError"):
                     raise AssistantError("schema_service_error", "The schema MCP could not select a schema.")
