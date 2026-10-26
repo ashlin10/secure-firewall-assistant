@@ -18,17 +18,23 @@ DEFAULT_PROMPT = r"(?m)^[^\r\n]*[>#$%]\s*\Z"
 LIMIT = 1024 * 1024
 
 
-def resolve_text(value, secrets, device=None):
+def resolve_text(value, secrets, device=None, account_lookup=None):
     if isinstance(value, str):
         return value
     if not isinstance(value, dict):
         raise AssistantError("invalid_ssh_text", "Supply command text or a template with local secret references.")
     if set(value) == {"$device"} and device is not None:
-        if value["$device"] == "ssh_username":
+        field = value["$device"]
+        if field not in {"ssh_username", "ssh_password", "https_username", "https_password"}:
+            raise AssistantError("invalid_ssh_text", "Device references select an enrolled SSH or HTTPS account field.")
+        protocol, attribute = field.split("_", 1)
+        if attribute == "password":
+            return secrets.get(device.credential_ref, protocol=protocol)
+        if protocol == "ssh":
             return device.username
-        if value["$device"] == "ssh_password":
-            return secrets.get(device.credential_ref, protocol="ssh")
-        raise AssistantError("invalid_ssh_text", "Device references support ssh_username or ssh_password.")
+        if account_lookup is None:
+            raise AssistantError("invalid_ssh_text", "The selected device account is unavailable.")
+        return account_lookup(protocol).username
     if set(value) == {"$secret"}:
         return secrets.resolve(value)
     if set(value) != {"template", "values"} or not isinstance(value["template"], str) or not isinstance(value["values"], dict):
@@ -121,10 +127,10 @@ def execute(state, secrets, target, authorization_request, commands, mode="shell
         for item in responses:
             if set(item) != {"pattern", "response"} or not isinstance(item["pattern"], str):
                 raise ValueError
-            replies.append((re.compile(item["pattern"]), resolve_text(item["response"], secrets, device)))
+            replies.append((re.compile(item["pattern"]), resolve_text(item["response"], secrets, device, lambda protocol: state.device(target, protocol=protocol))))
     except (ValueError, TypeError, re.error):
         raise AssistantError("invalid_ssh_prompt", "Supply valid prompt regexes and explicit pattern/response objects.") from None
-    prepared = [resolve_text(command, secrets, device) for command in commands]
+    prepared = [resolve_text(command, secrets, device, lambda protocol: state.device(target, protocol=protocol)) for command in commands]
     if any(not command.strip() or len(command) > 65536 or "\x00" in command for command in prepared):
         raise AssistantError("invalid_ssh_text", "SSH command text must be nonempty, NUL-free and at most 64 KiB.")
     address = urlsplit(device.address).hostname if device.kind == "fmc" else device.address

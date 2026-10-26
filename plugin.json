@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "secure-firewall-assistant",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Configure enrolled lab devices through FMC REST and arbitrary authorized SSH commands.",
   "author": {"name": "FMC lab assistant maintainers"},
   "keywords": ["cisco", "firewall", "fmc", "ftd", "lab"],

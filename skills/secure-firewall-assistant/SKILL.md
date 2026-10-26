@@ -100,7 +100,9 @@ A returned prompt is a receipt, not proof of success. Inspect partial output and
 errors; commands are never retried automatically. Use a custom `prompt_pattern`
 for unusual prompts and explicit `prompt_responses` for interactive steps. Resolve
 password/key responses and command-template values using local `$secret` references;
-never ask for or print credentials. See `references/diagnostics.md` for syntax.
+never ask for or print credentials. A console-server SSH login and downstream
+device login can use different enrolled accounts; select the appropriate local
+account explicitly for each prompt. See `references/diagnostics.md` for syntax.
 For switch VLANs, discover the actual device-facing ports and channel groups,
 preserve existing allowed VLANs with additive commands, and verify running and
 saved state. Never guess wiring from device names. No implicit FMC deployment.

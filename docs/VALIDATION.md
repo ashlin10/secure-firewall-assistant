@@ -1,3 +1,9 @@
+## 0.6.1 console account selection
+
+- Full suite: 200 tests passed, including separate SSH transport and downstream console-account selection without model-visible credentials.
+- Live console-server SSH authentication and downstream switch login succeeded with the two respective enrolled accounts; no inventory credential change was required.
+- Regression tests confirm selecting the downstream account does not replace the transport SSH account or expose either password in results.
+
 ## 0.6.0 general device SSH
 
 - General SSH tests cover all six enrolled categories, arbitrary pipe/multiline command text, retained CLI context, SSH exec exit status/stderr, protocol-specific FMC SSH accounts, local secret templates, explicit console credentials, network/OS prompts, paging, partial evidence, and no automatic command replay.

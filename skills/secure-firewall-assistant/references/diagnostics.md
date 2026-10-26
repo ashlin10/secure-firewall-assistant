@@ -75,3 +75,9 @@ using `{"$device":"ssh_username"}` or `{"$device":"ssh_password"}` as the
 response value. These resolve only the selected device’s enrolled SSH account
 locally; no password is returned to the model. A `Password OK` console-server
 prompt can receive an explicit empty response to solicit the device login.
+
+When the SSH endpoint is a console server and the downstream device uses the
+other enrolled account, explicit `{"$device":"https_username"}` and
+`{"$device":"https_password"}` responses select that account for the console
+login. SSH transport still uses the enrolled SSH account. Do not assume that a
+transport login and downstream console login use the same account.

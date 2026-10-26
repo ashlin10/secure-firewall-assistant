@@ -172,3 +172,33 @@ def test_console_login_failure_stops_before_another_credential_reply():
                               [(device_ssh.re.compile(r'login:\s*$'), 'fixture')], 1, True)
     assert error.value.code == 'ssh_console_authentication_failed'
     assert channel.sent == []
+
+
+def test_console_account_can_differ_from_ssh_transport(session, monkeypatch):
+    state, secrets, device, _, _, _, _, connects = session
+    original = state.device
+    state.device = lambda target, **kwargs: (SimpleNamespace(username='device-admin')
+                                             if kwargs.get('protocol') == 'https' else original(target, **kwargs))
+    calls = []
+    original_get = secrets.get
+    def get(reference, protocol=None):
+        calls.append(protocol)
+        if protocol == 'https':
+            secrets.redactor.register('SYNTHETIC-CONSOLE-LOGIN')
+            return 'SYNTHETIC-CONSOLE-LOGIN'
+        return original_get(reference, protocol=protocol)
+    monkeypatch.setattr(secrets, 'get', get)
+    replies = []
+    def read(channel, prompt, responses, timeout, authenticating=False):
+        replies.extend(response for _, response in responses)
+        return 'sw# '
+    monkeypatch.setattr(device_ssh, 'shell_read', read)
+    result = device_ssh.execute(state, secrets, 'enrolled', 'Read console switch', ['show version'],
+                                prompt_responses=[{'pattern': 'login:', 'response': {'$device': 'https_username'}},
+                                                  {'pattern': 'Password:', 'response': {'$device': 'https_password'}}])
+    assert result['ok']
+    assert connects[0][1]['username'] == 'ssh-user'
+    assert connects[0][1]['password'] == 'SYNTHETIC-SSH-LOGIN'
+    assert replies[:2] == ['device-admin', 'SYNTHETIC-CONSOLE-LOGIN']
+    assert 'https' in calls and 'ssh' in calls
+    assert 'SYNTHETIC' not in json.dumps(result)
