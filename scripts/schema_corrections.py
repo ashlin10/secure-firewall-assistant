@@ -3,11 +3,17 @@
 VPN_ENDPOINT_PATH = "/api/fmc_config/v1/domain/{domainUUID}/policy/ftds2svpns/{containerUUID}/endpoints"
 CORRECTION_NOTE = (
     "Declared createVpnEndpoint bulk query and single/array request bodies; "
-    "bulk support confirmed by the project owner (2026-10-21)"
+    "bulk support confirmed by the project owner (2026-10-21); "
+    "allowed VPN endpoint interface type VTI, observed in FMC 10.5 route-based endpoints (2026-10-26)"
 )
 
 
 def apply_corrections(document):
+    # Endpoint references use VTI, whereas device interface resources use
+    # VTIInterface. Keep the underlay tunnelSourceInterface enum unchanged.
+    interface_type = document["components"]["schemas"]["VpnEndpointInterfaceReference"]["properties"]["type"]
+    if "VTI" not in interface_type["enum"]:
+        interface_type["enum"].append("VTI")
     operation = document["paths"][VPN_ENDPOINT_PATH]["post"]
     parameters = operation["parameters"]
     if not any(p.get("name") == "bulk" and p.get("in") == "query" for p in parameters):

@@ -75,3 +75,5 @@ with current reads and documented body/filter requirements.
 The maintained VPN endpoint POST declares native bulk with object/array bodies.
 The shared registry distributes the corrected schema. See [shared schema service](SCHEMA-SERVICE.md)
 for version selection, latest-version fallback, revision updates, and local caching.
+
+VPN endpoint interface references accept `VTI`, the type returned by FMC for route-based VPN endpoints. Device VTI resources continue to use `VTIInterface`; tunnel-source references remain restricted to supported underlay interfaces.

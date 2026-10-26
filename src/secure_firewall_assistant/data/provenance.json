@@ -1,7 +1,7 @@
 {
   "source_filename": "merged_oas3_10_5_0_0.json",
   "source_sha256": "0ae1d4c207415fae1506b34782caa0196af14fec90d7696392a5a7e9ac25304f",
-  "sanitized_sha256": "ea9ff8e286a7ffa71c5bb6d4e39b1f0a8adf59503327f1297ecbc3105c64158c",
+  "sanitized_sha256": "e4bb30e1c331e9459e6bc8305c06511d51b9e9ba7f3f8140fbe47654dc926690",
   "openapi": "3.0.1",
   "info_version": "1.0.0",
   "declared_device_version": "10.5.0.0",
@@ -16,8 +16,9 @@
     "Removed non-structural sample credential values repeated elsewhere in the document",
     "Replaced non-public-documentation example URLs",
     "No missing definitions fabricated; affected response validation reports a warning",
-    "Declared createVpnEndpoint bulk query and single/array request bodies; bulk support confirmed by the project owner (2026-10-21)"
+    "Declared createVpnEndpoint bulk query and single/array request bodies; bulk support confirmed by the project owner (2026-10-21)",
+    "Declared createVpnEndpoint bulk query and single/array request bodies; bulk support confirmed by the project owner (2026-10-21); allowed VPN endpoint interface type VTI, observed in FMC 10.5 route-based endpoints (2026-10-26)"
   ],
-  "schema_revision": "r1",
+  "schema_revision": "r2",
   "version_source": "Project owner identified supplied schema as FMC 10.5.0.0"
 }

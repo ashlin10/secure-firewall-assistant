@@ -1,3 +1,8 @@
+# 0.5.5 — 2026-10-26
+
+- Accept the FMC route-based VPN endpoint interface type `VTI` in single/bulk REST creates, updates, and read-back validation. Preserve physical-interface and tunnel-source constraints.
+- Preserve the correction during schema imports and publish it as FMC 10.5.0.0 schema revision r2.
+
 # 0.5.4
 
 - Store and edit separate SSH and HTTPS accounts per device, with shared-account migration.

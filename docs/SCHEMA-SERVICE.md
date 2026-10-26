@@ -26,7 +26,7 @@ its stable standalone dispatcher follows the installed plugin version.
 After updating the plugin, start a new local chat; an existing
 desktop process may retain old tool/resource definitions until restarted.
 
-The supplied, maintained schema is identified as FMC **10.5.0.0, revision r1**,
+The supplied, maintained schema is identified as FMC **10.5.0.0, revision r2**,
 based on the project owner's version identification. This does not assert live
 compatibility with every operation or FMC build. Numeric versions are normalized
 to four components; build labels do not change the schema version selection.

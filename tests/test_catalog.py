@@ -1,6 +1,8 @@
 import gzip
 import hashlib
+import importlib.util
 import json
+from pathlib import Path
 
 import pytest
 
@@ -116,3 +118,39 @@ def test_registration_collection_is_executable_without_opening_special_operation
     assert operation['execution_options']['bulk_create_supported'] is True
     assert catalog.describe('createBulkRegistration')['execution_available'] is False
     assert catalog.describe('deleteMultipleDevice')['execution_available'] is False
+
+
+@pytest.mark.parametrize("interface_type", ["VTI", "PhysicalInterface", "SubInterface"])
+def test_vpn_endpoint_interface_types_for_create_bulk_and_update(catalog, interface_type):
+    endpoint = {
+        "device": {"id": "device-1", "type": "Device"},
+        "interface": {"id": "interface-1", "name": "vpn-interface", "type": interface_type},
+        "peerType": "PEER", "connectionType": "BIDIRECTIONAL", "extranet": False,
+    }
+    path = {"containerUUID": "topology-1"}
+    catalog.prepare("createVpnEndpoint", path, {}, {}, endpoint, "domain-1")
+    catalog.prepare("createVpnEndpoint", path, {"bulk": True}, {}, [endpoint], "domain-1")
+    catalog.prepare("updateVpnEndpoint", {**path, "objectId": "endpoint-1"}, {}, {},
+                    {**endpoint, "id": "endpoint-1"}, "domain-1")
+    assert not catalog.validate_response("createVpnEndpoint", 201, endpoint)
+
+
+def test_vpn_vti_correction_preserves_reference_constraints(catalog):
+    spec = importlib.util.spec_from_file_location(
+        "schema_corrections", Path(__file__).resolve().parents[1] / "scripts/schema_corrections.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    apply_corrections = module.apply_corrections
+
+    document = json.loads(json.dumps(catalog.doc))
+    document["components"]["schemas"]["VpnEndpointInterfaceReference"]["properties"]["type"]["enum"].remove("VTI")
+    apply_corrections(document)
+    apply_corrections(document)
+    schemas = document["components"]["schemas"]
+    reference = schemas["VpnEndpointInterfaceReference"]
+    assert reference["properties"]["type"]["enum"].count("VTI") == 1
+    for value in ({"id": "intf", "type": "InventedInterface"}, {"type": "VTI"}):
+        with pytest.raises(AssistantError):
+            catalog.validate(reference, value)
+    with pytest.raises(AssistantError):
+        catalog.validate(schemas["VpnEndpointTunnelSourceInterfaceReference"], {"id": "intf", "type": "VTI"})
