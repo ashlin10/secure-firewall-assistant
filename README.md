@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.5.5
+# Secure Firewall Assistant 0.6.0
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
@@ -43,6 +43,15 @@ Examples after enrollment:
 The last request has a different effect from configuration. **Configuration never
 implicitly triggers deployment.** Explicit deployment uses a fresh pending-change
 preview and does not bypass warnings or force deployment.
+
+## General SSH
+
+`device_ssh` provides read/write/execute SSH access to every enrolled device type,
+without a command allowlist. It uses the saved SSH account and port, supports
+interactive CLI and OS exec commands, explicit prompt responses, and local secret
+references. It records redacted output and partial outcomes and never retries
+commands automatically. Read state before changes and verify the result afterward.
+See [SSH usage](skills/secure-firewall-assistant/references/diagnostics.md).
 
 ## Scope and verification
 

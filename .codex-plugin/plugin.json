@@ -1,14 +1,14 @@
 {
   "name": "secure-firewall-assistant",
-  "version": "0.5.5",
-  "description": "Configure and validate enrolled Cisco Secure Firewall lab devices through local REST and optional SSH tools.",
+  "version": "0.6.0",
+  "description": "Configure enrolled lab devices through FMC REST and arbitrary authorized SSH commands.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "requires_local_executor": true,
   "interface": {
     "displayName": "Secure Firewall Assistant",
-    "shortDescription": "Configure and verify lab FMCs",
-    "longDescription": "Uses your private local inventory and a local YAML credential file for lab devices. Discovers supported FMC operations from the supplied OpenAPI reference, verifies saved configuration, and supports FTD configuration and bounded diagnostics over SSH. Deployment requires an explicit request.",
+    "shortDescription": "Lab REST and SSH execution",
+    "longDescription": "Uses your private local inventory and a local YAML credential file for lab devices. Discovers supported FMC operations from the supplied OpenAPI reference, verifies saved configuration, and provides unrestricted command execution over enrolled SSH accounts for FMCs, FTDs, switches, routers, endpoints, and traffic generators. Deployment requires an explicit request.",
     "developerName": "FMC lab assistant maintainers",
     "category": "Developer Tools",
     "capabilities": [

@@ -149,9 +149,8 @@ type moves its entry while retaining its account; blank passwords preserve the
 saved password. Entries without a type in old format-1 files default to FMC.
 Existing explicit FTD types are preserved. Legacy metadata and API-only secrets
 are retained, and `.sfa-devices-pre-grouped.backup` preserves the pre-migration file.
-The form never exposes saved passwords. These new categories provide inventory
-storage; they do not add execution adapters for endpoints, routers, switches, or
-traffic generators.
+The form never exposes saved passwords. All six categories support arbitrary authorized SSH commands through
+`device_ssh` as of 0.6.0, using each device’s separately enrolled SSH account.
 
 ## Separate protocol accounts
 

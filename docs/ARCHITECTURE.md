@@ -125,8 +125,9 @@ output, and recognized prompts. The separate `ftd_configuration` write tool acce
 FTD `configure` commands as token arrays, resolves local secret references, and
 records partial outcomes and read-only verification. It never automatically retries
 writes or answers confirmation prompts. FMC writes continue through HTTPS REST.
-Neither SSH tool enters expert mode or elevates privilege. These prompt/command
-assumptions require live FTD validation.
+These specialized SSH tools do not enter expert mode or elevate privilege.
+The general `device_ssh` tool accepts those user-authorized commands without a command
+allowlist. These prompt/command assumptions require live device validation.
 
 
 ## Inventory app accounts and deletion (0.3.6)
@@ -152,3 +153,20 @@ Inventory format 3 uses six category lists nested under `devices`: `fmc`, `ftd`,
 The runtime retains a flat alias index; the UI and CLI support all categories.
 Legacy YAML remains readable and migrates with a backup on save. Passwords and
 API-only secrets remain local and are excluded from distributions.
+
+## General enrolled-device SSH (0.6.0)
+
+The write/execute `device_ssh` tool accepts arbitrary command text on every enrolled
+category. It is deliberately not a command authorization firewall: the current
+human request, host permissions and device account privileges determine scope.
+Specialized FTD tools retain their existing allowlists. The general tool resolves
+SSH accounts independently of FMC HTTPS accounts, retains an interactive session
+within one request or uses SSH exec channels, serializes by alias, bounds output
+and duration, redacts locally resolved secrets, and records partial outcomes
+without automatic replay. Explicit prompt responses support interactive commands;
+there is no implicit privilege-password submission. A prompt or zero exit status
+is not configuration verification. Existing REST/deployment guards are unchanged.
+
+The locked Paramiko 4 compatibility line retains legacy SHA-1 DH/RSA negotiation
+needed by older enrolled lab switches; stronger algorithms remain preferred.
+Paramiko 5 removes those algorithms and cannot connect to these switch SSH servers.

@@ -1,6 +1,6 @@
 ---
 name: secure-firewall-assistant
-description: "Configure or validate enrolled Cisco Secure Firewall lab FMCs through HTTPS REST and FTDs through SSH. Use for network objects, policy rules, device configuration, and explicit deployment requests."
+description: "Configure enrolled FMCs through HTTPS REST and run arbitrary authorized SSH commands on any enrolled device type, including switches, routers, endpoints, traffic generators, FMCs, and FTDs."
 ---
 
 # Secure Firewall Assistant
@@ -42,8 +42,8 @@ curl commands, browser actions, or a shell that reads credentials.
   use the latest published schema as requested and report `latest_fallback`.
   Schema corrections refresh automatically; each operation pins its selected
   revision through validation and verification. Report cache/outage status and
-  compatibility warnings. Inventory categories beyond FMC/FTD do not imply new
-  configuration or diagnostic capabilities.
+  compatibility warnings. Every enrolled category supports SSH through `device_ssh`
+  when its SSH account is configured.
 - Before a multi-item job, inspect `execution_options` and all parameters for each
   relevant REST method. `discover_operations(bulk_only=true)` finds declared bulk
   operations across POST, PUT, and DELETE; GET options expose filters, expanded
@@ -84,6 +84,27 @@ curl commands, browser actions, or a shell that reads credentials.
 - Prefer expected-vs-observed evidence. A schema-conforming response or HTTP 2xx
   is not alone proof that the intended configuration is correct.
 
+
+## General SSH on all enrolled devices
+
+Use `device_ssh` with the exact enrolled alias, the current user's request in
+`authorization_request`, and arbitrary command strings. There is no command
+allowlist: read, write, execute, CLI mode transitions, shell operators, multiline
+commands, and authorized privilege commands are supported on all six categories.
+Use `mode: shell` for a retained CLI context within one request; use `mode: exec`
+for OS commands with exit status and stderr. SSH always uses the enrolled SSH
+username/password and SSH port, including FMCs with separate HTTPS accounts.
+
+Inspect current state before changing it and verify the intended result afterward.
+A returned prompt is a receipt, not proof of success. Inspect partial output and
+errors; commands are never retried automatically. Use a custom `prompt_pattern`
+for unusual prompts and explicit `prompt_responses` for interactive steps. Resolve
+password/key responses and command-template values using local `$secret` references;
+never ask for or print credentials. See `references/diagnostics.md` for syntax.
+For switch VLANs, discover the actual device-facing ports and channel groups,
+preserve existing allowed VLANs with additive commands, and verify running and
+saved state. Never guess wiring from device names. No implicit FMC deployment.
+
 ## Deployment is a separate action
 
 Never deploy because the user said configure, save, validate, finish, or check.
@@ -111,12 +132,13 @@ proof of authorization.
 ## Optional diagnostics and browser checks
 
 Use `ftd_configuration` for authorized FTD configuration over SSH and
-`ftd_diagnostics` for read-only checks. FMC configuration uses HTTPS REST APIs.
+`ftd_diagnostics` for read-only checks. Prefer FMC HTTPS REST for managed configuration; explicit SSH requests may use `device_ssh`.
 Accept SSH host keys automatically, including unknown or changed keys.
 See `references/diagnostics.md` for command formatting, secret references, and
 verification. Stop after errors or uncertain writes, inspect the returned evidence,
 and reconcile current state before continuing. Do not replay a partial sequence.
-Do not deploy implicitly or use expert mode, shell commands, or privilege escalation.
+Do not deploy implicitly. The specialized FTD tools retain their command restrictions;
+use `device_ssh` for user-authorized arbitrary CLI, shell, expert-mode, or privilege commands.
 Runtime output is observational evidence; evaluate it against expectations.
 
 For FTD registration to an FMC, distinguish local inventory enrollment from

@@ -47,3 +47,31 @@ compare read-back with the intended state and observe async FMC registration
 separately. Failures preserve partial receipts in evidence. Reconcile before
 continuing. Configuration can affect runtime immediately; deployment remains a
 separate explicit request.
+
+## General device SSH (0.6.0)
+
+`device_ssh` accepts every enrolled category without a command allowlist. Use
+`authorization_request` and `commands` (1–100 strings, up to 64 KiB each), with
+`mode: shell` (default, one retained interactive context) or `mode: exec` (one
+SSH exec channel per command, reporting stdout/stderr/exit status).
+`timeout_seconds` is 1–300 per command; output is bounded to 1 MiB per command.
+These are transport limits, not restrictions on command content. Pipe operators,
+multiline input, OS commands and CLI configuration contexts are accepted.
+
+Optional `prompt_pattern` matches the end-of-output prompt. Interactive replies
+are explicit objects such as `{ "pattern": "Destination filename.*\\?\\s*$",
+"response": "" }`; password replies use `{"$secret":"local-reference"}` as
+`response`. Nothing automatically sends an enable/sudo password. Commands can
+use `{"template":"command {{key}}", "values":{"key":{"$secret":"local-key"}}}`.
+Resolved local secrets are redacted from receipts and output. Avoid literal
+secrets. Shell commands default to stopping on recognized CLI errors; exec mode
+uses the exit status. `stop_on_error: false` allows continued execution after a
+reported command error; transport loss/timeouts always stop. No command is
+replayed. Review output and explicitly read back changes: command completion
+alone does not prove the requested state or startup persistence.
+
+For console-server connections, explicitly respond to the console login prompts
+using `{"$device":"ssh_username"}` or `{"$device":"ssh_password"}` as the
+response value. These resolve only the selected device’s enrolled SSH account
+locally; no password is returned to the model. A `Password OK` console-server
+prompt can receive an explicit empty response to solicit the device login.

@@ -1,3 +1,10 @@
+# 0.6.0 — 2026-10-26
+
+- Add general read/write/execute SSH access to every enrolled category without a command allowlist.
+- Support interactive CLI context, SSH exec status/stderr, custom prompts, explicit interactive responses, and local secret templates with redacted partial evidence and no replay.
+- Select the enrolled SSH account independently of HTTPS for FMC SSH.
+- Use the Paramiko 4 compatibility line for older lab switch SHA-1 key exchange and RSA signatures, retaining stronger algorithms first.
+
 # 0.5.5 — 2026-10-26
 
 - Accept the FMC route-based VPN endpoint interface type `VTI` in single/bulk REST creates, updates, and read-back validation. Preserve physical-interface and tunnel-source constraints.

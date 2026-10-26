@@ -1,3 +1,10 @@
+## 0.6.0 general device SSH
+
+- General SSH tests cover all six enrolled categories, arbitrary pipe/multiline command text, retained CLI context, SSH exec exit status/stderr, protocol-specific FMC SSH accounts, local secret templates, explicit console credentials, network/OS prompts, paging, partial evidence, and no automatic command replay.
+- Regression coverage prevents re-sending an interactive response on ANSI/whitespace chunks or mistaking an earlier password prompt for a new prompt after authentication.
+- Downstream console authentication failure stops before another credential reply. Live switch connections negotiated legacy SSH successfully; the console login rejected the enrolled account, so no switch configuration was attempted.
+- Standalone stdio verification checks the installed release, write/execute tool annotation, all 20 tools, and both inventory MCP App resources. Desktop tool refresh is a separate host-restart check.
+
 # 0.5.3 validation — 2026-10-22
 
 - 173 automated tests pass, including concurrent local registration key creation,

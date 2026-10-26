@@ -91,7 +91,7 @@ class State:
         self.inventory_path = self.config / "inventory.json"
         self.device_file = device_file or plugin_root() / "devices.yaml"
 
-    def inventory(self) -> dict:
+    def inventory(self, protocol: str | None = None) -> dict:
         try:
             obj = (json.loads(self.inventory_path.read_text(encoding="utf-8"))
                    if self.inventory_path.exists() else {"format_version": 1, "devices": {}})
@@ -122,12 +122,12 @@ class State:
                             if (previous.hostname == row["hostname"] and
                                     (previous.port or 443) == row["https_port"]):
                                 runtime["address"] = saved_address
-                        runtime["username"] = login_value(fields, "https" if kind == "fmc" else "ssh", "username")
+                        runtime["username"] = login_value(fields, protocol or ("https" if kind == "fmc" else "ssh"), "username")
                         runtime.setdefault("credential_ref", name + "-auth")
                         device = Device(**runtime)
                     else:
                         runtime = {key: value for key, value in fields.items() if key not in ("password", *LOGIN_FIELDS)}
-                        runtime["username"] = login_value(fields, "https" if fields.get("kind", "fmc") == "fmc" else "ssh", "username")
+                        runtime["username"] = login_value(fields, protocol or ("https" if fields.get("kind", "fmc") == "fmc" else "ssh"), "username")
                         device = Device(**runtime)
                     if name != device.alias:
                         raise ValueError
@@ -146,8 +146,8 @@ class State:
             obj["devices"][device.alias] = asdict(device)
             atomic_json(self.inventory_path, obj)
 
-    def device(self, alias: str, kind: str | None = None) -> Device:
-        obj = self.inventory()["devices"]
+    def device(self, alias: str, kind: str | None = None, *, protocol: str | None = None) -> Device:
+        obj = self.inventory(protocol=protocol)["devices"]
         if alias not in obj:
             raise AssistantError("unknown_target", "Select an enrolled target by exact alias.", available_aliases=sorted(obj))
         device = Device(**obj[alias])

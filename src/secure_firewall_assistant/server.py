@@ -9,6 +9,7 @@ from mcp.server import MCPServer
 from mcp.types import CallToolResult, ToolAnnotations
 
 from . import __version__
+from .device_ssh import execute as device_ssh
 from .errors import AssistantError
 from .service import Assistant
 from .ssh import configuration, diagnostics
@@ -23,8 +24,9 @@ current deployment request, with all pending changes on named devices authorized
 Configuration secret fields use local $secret references. Saved FMC configuration is not proof of FTD
 runtime behavior. Report evidence IDs, mismatches, incomplete pages, async state, and deployment state.
 Accept device SSH host keys automatically, including unknown and changed keys, without permission.
-Configure FMC through HTTPS REST. Configure FTD through ftd_configuration over SSH;
-use ftd_diagnostics for read-only checks. Never substitute FMC SSH configuration.
+Prefer FMC HTTPS REST for managed configuration. Specialized FTD configuration and diagnostic tools remain available.
+device_ssh runs arbitrary user-authorized SSH commands on every enrolled device type, without a command allowlist.
+Use enrolled SSH credentials, observe current state before writes, verify changes, and never replay uncertain writes.
 Inspect execution_options for every method before large jobs. Prefer declared native bulk;
 use execute_configuration_batch for independent creates, never guess bulk support.
 """
@@ -66,7 +68,7 @@ def build_server(assistant: Assistant | None = None):
                                 "target": result.get("target"), "operation_id": result.get("operation_id"),
                                 "output_truncated": True,
                                 "verification": {"status": result.get("verification", {}).get("status")},
-                                "deployment_performed": result.get("deployment_performed", False),
+                                "deployment_performed": result.get("deployment_performed"),
                                 "result_complete": result.get("result", {}).get("complete"),
                                 "next_step": "Read evidence by run_id with smaller item pages or a JSON pointer, or narrow the query. Do not infer omitted values."}
                     return result
@@ -180,6 +182,17 @@ def build_server(assistant: Assistant | None = None):
         return assistant.evidence.save({"ok": result["ok"], "target": target,
                                         "operation_id": "ftd_configuration", "authorization_request": authorization_request,
                                         "deployment_performed": False, "result": result})
+
+    @expose("device_ssh", "Run arbitrary user-authorized SSH commands on ANY enrolled device type using its saved SSH account; no command allowlist. Shell mode retains CLI context across commands; exec mode runs separate SSH exec requests. Supports local secret references and explicit interactive prompt responses. Requires the current user request, captures bounded output, stops on errors/timeouts without replay, and records evidence. Read state before writes and verify the intended result. This is a write/execute tool even for read-only commands.", write=True)
+    def run_device_ssh(target: str, authorization_request: str, commands: list[str | dict],
+                       mode: Literal["shell", "exec"] = "shell", timeout_seconds: int = 30,
+                       prompt_pattern: str | None = None, prompt_responses: list[dict] | None = None,
+                       stop_on_error: bool = True) -> dict:
+        result = device_ssh(assistant.state, assistant.secrets, target, authorization_request, commands,
+                            mode, timeout_seconds, prompt_pattern, prompt_responses, stop_on_error)
+        return assistant.evidence.save({"ok": result["ok"], "target": target,
+                                        "operation_id": "device_ssh", "authorization_request": authorization_request,
+                                        "result": result})
 
     @expose("read_evidence", "Read private redacted evidence by run ID. Paginate result.items or select a nested field with a JSON pointer, e.g. /verification/status.")
     def evidence(run_id: str, offset: int = 0, limit: int = 20, pointer: str = "") -> dict:
