@@ -298,3 +298,21 @@ def test_vpn_endpoint_batch_uses_native_bulk(assistant, lab):
                                      path={"containerUUID": "vpn-1"})
     assert result["result"]["counts"] == {"verified_in_fmc": 2}
     assert len([r for r in lab.calls if r.method == "POST" and r.url.path.endswith("endpoints")]) == 1
+
+
+def test_deployment_uses_fresh_timestamp_without_ignoring_pending_changes(assistant, lab):
+    preview = assistant.preview_deployment("lab-fmc-1", ["ftd-1"])
+    original = assistant._deployment_snapshot
+    def fresh(target, identifiers):
+        result = original(target, identifiers)
+        result["version"] = "12346"
+        result["devices"][0]["version"] = "12346"
+        return result
+    assistant._deployment_snapshot = fresh
+    assistant.deploy("lab-fmc-1", preview["preview_id"], "Deploy all", "all_pending_on_selected_devices")
+    payload = json.loads(next(r.content for r in lab.calls if r.url.path.endswith("deploymentrequests")))
+    assert payload["version"] == "12346"
+    preview = assistant.preview_deployment("lab-fmc-1", ["ftd-1"])
+    lab.pending.append({"entityUUID": "other", "action": "ADD"})
+    with pytest.raises(AssistantError, match="changed"):
+        assistant.deploy("lab-fmc-1", preview["preview_id"], "Deploy all", "all_pending_on_selected_devices")

@@ -1,3 +1,7 @@
+## 0.6.5
+
+- Compare deployment preview content independently of FMC’s per-read deployment timestamp, and submit the latest timestamp after revalidation.
+
 ## 0.6.4
 
 - Project RA VPN create requests separately from generated child references and optional DAP response fields.

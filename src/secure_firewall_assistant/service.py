@@ -386,7 +386,12 @@ class Assistant:
 
     @staticmethod
     def _digest(value):
-        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        # FMC returns a fresh deployment timestamp on each enumeration. Compare
+        # the reviewed content, then submit the current timestamp from recheck.
+        stable = {k: v for k, v in value.items() if k != "version"}
+        stable["devices"] = [{k: v for k, v in device.items() if k != "version"}
+                             for device in value["devices"]]
+        return hashlib.sha256(json.dumps(stable, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
     def _deployment_snapshot(self, target: str, device_ids: list[str]) -> dict:
         self.client(target).require_write_compatibility()
