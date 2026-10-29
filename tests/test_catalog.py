@@ -154,3 +154,11 @@ def test_vpn_vti_correction_preserves_reference_constraints(catalog):
             catalog.validate(reference, value)
     with pytest.raises(AssistantError):
         catalog.validate(schemas["VpnEndpointTunnelSourceInterfaceReference"], {"id": "intf", "type": "VTI"})
+
+
+def test_ha_configuration_is_executable_without_namespace_restriction(catalog):
+    for operation in ("createFTDHADeviceContainer", "updateFTDHADeviceContainer",
+                      "deleteFTDHADeviceContainer", "updateFTDHAMonitoredInterfaces"):
+        assert catalog.describe(operation)["effect"] == "configuration"
+        assert catalog.describe(operation)["execution_available"] is True
+    assert catalog.describe("createDeploymentRequest")["effect"] == "deployment"

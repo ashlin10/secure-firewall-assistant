@@ -1,3 +1,7 @@
+## 0.6.2
+
+- Recognize FTD HA pair configuration endpoints in the ordinary REST executor, including creation, updates, and interface settings.
+
 # 0.6.1 — 2026-10-26
 
 - Allow explicit selected-device HTTPS account references in SSH prompt responses, so console-server SSH authentication can use one enrolled account and downstream device login can use the other without exposing credentials or changing transport authentication.

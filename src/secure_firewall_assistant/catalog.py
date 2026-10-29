@@ -42,7 +42,8 @@ def classify(method: str, path: str) -> str:
         return "runtime-or-special"
     if method == "post" and path.endswith("/devices/devicerecords"):
         return "configuration"
-    if any(p in path for p in ("/object/", "/policy/", "/devices/devicerecords/")):
+    if any(p in path for p in ("/object/", "/policy/", "/devices/devicerecords/",
+                                   "/devicehapairs/ftddevicehapairs")):
         return "configuration"
     return "unreviewed-write"
 
