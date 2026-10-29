@@ -1,3 +1,7 @@
+## 0.6.4
+
+- Project RA VPN create requests separately from generated child references and optional DAP response fields.
+
 ## 0.6.3
 
 - Support certificate enrollment and policy assignment configuration through REST.

@@ -169,3 +169,12 @@ def test_certificate_enrollment_and_policy_assignment_configuration(catalog):
                       "createManageDeviceCertificatesRequestModel"):
         assert catalog.describe(operation)["effect"] == "configuration"
         assert catalog.describe(operation)["execution_available"] is True
+
+
+def test_ra_vpn_create_does_not_require_generated_child_references(catalog):
+    prepared = catalog.prepare("createFTDRAVpnModel", {}, {}, {},
+                               {"name": "ra", "type": "RAVpn",
+                                "accessInterfaceSettings": {"interfaceSettings": []},
+                                "anyConnectClientImages": []}, "domain-1")
+    assert prepared["body"]["name"] == "ra"
+    assert "dapPolicy" in catalog.schema("FTDRAVpnModel")["schema"]["required"]

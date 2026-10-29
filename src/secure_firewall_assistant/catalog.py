@@ -220,7 +220,14 @@ class Catalog:
             if body is None and request_body.get("required"):
                 raise AssistantError("missing_body", "This operation requires a JSON body.")
             if body is not None:
-                self.validate(media.get("schema", {}), body)
+                schema = media.get("schema", {})
+                if op_id == "createFTDRAVpnModel":
+                    # The response model incorrectly requires generated child references
+                    # and an optional DAP. Cisco RA VPN create fixtures omit these.
+                    schema = copy.deepcopy(self.resolve(schema))
+                    schema["required"] = [key for key in schema.get("required", [])
+                                          if key not in {"addressAssignmentSettings", "connectionProfiles", "dapPolicy"}]
+                self.validate(schema, body)
         elif body is not None:
             raise AssistantError("unexpected_body", "This operation has no request body.")
         self.semantic(op, body, query)
