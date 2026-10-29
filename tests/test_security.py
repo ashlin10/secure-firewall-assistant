@@ -72,3 +72,12 @@ def test_inventory_upgrade_backup_preserves_original(state):
 def test_evidence_rejects_path_traversal(assistant):
     with pytest.raises(AssistantError):
         assistant.evidence.read("../../inventory.json")
+
+
+def test_vpn_control_fields_are_not_credentials():
+    from secure_firewall_assistant.security import Redactor
+    value = {"enablePasswordManagement": False, "useAuthorizationServerForIPv4": True,
+             "cookieChallenge": "CUSTOM", "thresholdToChallengeIncomingCookies": 50,
+             "encPasswordType": "Clear", "authenticationPassword": "hidden"}
+    cleaned = Redactor().clean(value)
+    assert cleaned == {**value, "authenticationPassword": "[REDACTED]"}

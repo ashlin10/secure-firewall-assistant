@@ -1,3 +1,8 @@
+## 0.6.3
+
+- Support certificate enrollment and policy assignment configuration through REST.
+- Preserve VPN control flags and password format selectors during redaction and validation.
+
 ## 0.6.2
 
 - Recognize FTD HA pair configuration endpoints in the ordinary REST executor, including creation, updates, and interface settings.

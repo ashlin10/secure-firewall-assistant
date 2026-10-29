@@ -37,6 +37,8 @@ def classify(method: str, path: str) -> str:
         return "read"
     if path.endswith("/deployment/deploymentrequests"):
         return "deployment"
+    if path.endswith(("/assignment/policyassignments", "/devices/operational/managecertificates")) or "/assignment/policyassignments/" in path:
+        return "configuration"
     if ("/operational/" in path or "/deployment/" in path or "/mappings" in path or
             "/overrides" in path or "/dynamicobjects" in path):
         return "runtime-or-special"

@@ -21,6 +21,10 @@ REFERENCE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$")
 
 
 def sensitive(key: str) -> bool:
+    if key in {"enablePasswordManagement", "useAuthorizationServerForIPv4",
+               "useAuthorizationServerForIPv6", "thresholdToChallengeIncomingCookies",
+               "cookieChallenge", "encPasswordType", "encryptionPasswordType"}:
+        return False
     return bool(SENSITIVE.search(key))
 
 

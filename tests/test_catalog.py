@@ -162,3 +162,10 @@ def test_ha_configuration_is_executable_without_namespace_restriction(catalog):
         assert catalog.describe(operation)["effect"] == "configuration"
         assert catalog.describe(operation)["execution_available"] is True
     assert catalog.describe("createDeploymentRequest")["effect"] == "deployment"
+
+
+def test_certificate_enrollment_and_policy_assignment_configuration(catalog):
+    for operation in ("createPolicyAssignment", "updatePolicyAssignment",
+                      "createManageDeviceCertificatesRequestModel"):
+        assert catalog.describe(operation)["effect"] == "configuration"
+        assert catalog.describe(operation)["execution_available"] is True
