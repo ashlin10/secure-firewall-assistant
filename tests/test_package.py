@@ -2,6 +2,8 @@ import importlib.util
 import zipfile
 from pathlib import Path
 
+from secure_firewall_assistant import __version__
+
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("sfa_package", ROOT / "scripts/package.py")
 packager = importlib.util.module_from_spec(SPEC)
@@ -21,4 +23,4 @@ def test_archives_are_valid_scoped_and_reproducible(tmp_path):
 
 
 def test_native_manifests_and_skill_validate():
-    assert packager.validate() == "0.6.1"
+    assert packager.validate() == __version__
