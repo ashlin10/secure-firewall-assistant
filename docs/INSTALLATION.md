@@ -149,11 +149,10 @@ standalone registration with
 
 ## Shared schemas and format-2 inventory (0.4.0)
 
-Codex clients retain the local plugin and stdio execution server. They must also
-reach `http://10.196.150.41:8765/mcp` on the trusted lab network for initial schema
-selection. Later operations can use cached schemas if that service is unavailable.
-The registry is a separately hosted read-only HTTP MCP, not a cloud-hosted device
-executor. See [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md) for publishing schema updates.
+Clients retain the local plugin and stdio execution server. The bundled schema
+works without access to the maintainer's network. An optional shared schema MCP
+service can be configured per user; see [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md).
+Use the portable plugin ZIP to share with others; see [SHARING.md](SHARING.md).
 
 The inventory form writes format-3 YAML with device-type lists nested under `devices` with a device-type dropdown.
 Before using a pre-0.4.0 plugin again, restore the private pre-grouping backup;

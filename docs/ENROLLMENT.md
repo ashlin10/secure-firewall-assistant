@@ -79,7 +79,7 @@ The inventory form preserves this advanced setting on save.
 
 For a lab/private CA with verification enabled, add
 `--ca-bundle /absolute/path/lab-ca.pem` on macOS, or
-`--ca-bundle 'C:\Users\you\Certificates\lab-ca.pem'` on Windows. Providing a CA
+`--ca-bundle "$env:USERPROFILE\Certificates\lab-ca.pem"` on Windows. Providing a CA
 bundle enables certificate and hostname verification even when
 `verify_ssl` is false.
 Add `--expected-version-prefix 10.5.` if you want writes blocked on any other

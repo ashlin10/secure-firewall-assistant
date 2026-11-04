@@ -17,6 +17,9 @@ TOP = {"plugin.json", "mcp.json", "pyproject.toml", "uv.lock", ".python-version"
 TOP.add(".mcp.json")
 TOP.add("devices.example.yaml")
 DIRECTORIES = {"src", "skills", "docs", "scripts", "deployment", ".codex-plugin"}
+MAINTAINER_FILES = {"scripts/push_repositories.py", "scripts/sync_schema_repository.py",
+                    "docs/REPOSITORIES.md", "docs/MAINTENANCE.md", "CONTRIBUTING.md"}
+
 EXCLUDED_PARTS = {"__pycache__", ".venv", ".pytest_cache", ".ruff_cache"}
 
 
@@ -64,12 +67,18 @@ def selected_files(root=ROOT, source=False):
             continue
         include = (rel.as_posix() in TOP or rel.parts[0] in DIRECTORIES or
                    (source and (rel.parts[0] in {"tests", ".github", ".agents"} or rel.as_posix() == ".gitignore")))
+        if not source and (rel.parts[0] == "deployment" or rel.as_posix() in MAINTAINER_FILES):
+            include = False
         if not include:
             continue
         if path.is_symlink():
             raise ValueError("Symlinks are not permitted in release archives")
-        if path.suffix == ".pyc" or path.name in {"inventory.json", "installation.json", ".env", "devices.yaml", "devices.yaml.lock"}:
+        if path.suffix == ".pyc" or path.name.startswith(".sfa-") or path.suffix in {".log", ".key", ".pem"} or path.name in {"active.json", "runtime.lock", "schema-service.json", "inventory.json", "installation.json", ".env", "devices.yaml", "devices.yaml.lock"}:
             raise ValueError("Private/generated file appeared in the release include set")
+        if not source and path.suffix in {".py", ".json", ".md", ".yaml", ".toml", ".ps1", ".command"}:
+            text = path.read_text(encoding="utf-8")
+            if re.search(r"/(?:Users|home)/[A-Za-z0-9_. -]+/|[A-Za-z]:\\Users\\[A-Za-z0-9_. -]+\\", text):
+                raise ValueError(f"Machine-specific home path in portable package: {rel}")
         chosen.append(path)
     return chosen
 

@@ -14,7 +14,7 @@ from .catalog import Catalog
 from .errors import AssistantError
 from .evidence import Evidence, compare
 from .fmc import FMC
-from .schema_registry import RemoteCatalogProvider, version_key
+from .schema_registry import configured_catalog_provider, version_key
 from .security import Redactor, SecretStore
 from .state import State
 
@@ -53,7 +53,7 @@ class Assistant:
         self.secrets = secrets or SecretStore(self.redactor)
         self._bootstrap_catalog = Catalog()
         self._catalog_context = ContextVar("selected_fmc_catalog", default=None)
-        self.catalog_provider = catalog_provider or RemoteCatalogProvider(self.state.data / "schema-cache")
+        self.catalog_provider = catalog_provider or configured_catalog_provider(self.state.config, self.state.data / "schema-cache")
         self.evidence = Evidence(self.state, self.redactor)
         self.clients = {}
         self.client_factory = client_factory
@@ -84,7 +84,7 @@ class Assistant:
     def health(self) -> dict:
         return {"version": __version__, "devices_enrolled": len(self.state.aliases()),
                 "schema": self._bootstrap_catalog.provenance, "network_access_tested": False,
-                "schema_service": {"url": getattr(self.catalog_provider, "url", None), "cache_directory": str(self.state.data / "schema-cache"),
+                "schema_service": {"mode": "remote" if getattr(self.catalog_provider, "url", None) else "bundled", "url": getattr(self.catalog_provider, "url", None), "cache_directory": str(self.state.data / "schema-cache"),
                                    "missing_version_policy": "latest", "refresh_seconds": 60},
                 "credential_file": str(self.secrets.path),
                 "runtime_writes": "Arbitrary user-authorized SSH commands on every enrolled device category; guarded FMC REST and explicit deployment tools",

@@ -154,4 +154,4 @@ plugin installer or establish that your actual Work account can import it.
    verify job completion and any requested runtime behavior.
 
 No device configuration or deployment was performed during this build. The original build did not install a plugin; subsequent local installation is recorded above. No plugin was uploaded to an account, published publicly, or connected to a workspace marketplace. Repository hosting
-is maintained separately; see [REPOSITORIES.md](REPOSITORIES.md).
+is maintained separately in the maintainer source distribution.

@@ -1,3 +1,9 @@
+## 0.6.7
+
+- Make the recipient ZIP independent of personal paths and private schema infrastructure; use the bundled FMC schema by default with an optional locally configured shared service.
+- Exclude maintainer deployment/synchronization scripts and local runtime artifacts from the plugin ZIP; reject machine-specific home paths during packaging.
+- Document export/import and per-recipient setup without sharing inventory, credentials, caches, or virtual environments.
+
 ## 0.6.6
 
 - Scope standalone MCP plugin discovery to its enabled marketplace so unrelated marketplace lookups cannot block startup. Preserve duplicate-plugin checks.

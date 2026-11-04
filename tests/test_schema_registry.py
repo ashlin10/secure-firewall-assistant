@@ -57,7 +57,7 @@ def test_remote_refresh_cache_integrity_and_no_device_payloads(tmp_path):
         calls.append(body)
         result = {} if body['method'] == 'initialize' else {'structuredContent': remote.package(body['params']['arguments']['fmc_version'])}
         return httpx.Response(200, json={'jsonrpc':'2.0','id':body['id'],'result':result})
-    provider = RemoteCatalogProvider(tmp_path / 'cache', transport=httpx.MockTransport(handle), refresh_seconds=0)
+    provider = RemoteCatalogProvider(tmp_path / 'cache', url='https://schemas.example.test/mcp', transport=httpx.MockTransport(handle), refresh_seconds=0)
     first = provider.get('10.1.0 (build 160)')
     assert first.provenance['selection'] == 'latest_fallback'
     publish(remote.directory, DATA / 'fmc.openapi.json.gz', '10.5.0.0', 'r2')
@@ -85,7 +85,7 @@ def test_corrupt_online_package_does_not_silently_use_cache(tmp_path):
     def handle(request):
         body = json.loads(request.content)
         return httpx.Response(200, json={'id':body['id'],'result':{} if body['method']=='initialize' else {'structuredContent':package}})
-    provider = RemoteCatalogProvider(tmp_path / 'cache', transport=httpx.MockTransport(handle))
+    provider = RemoteCatalogProvider(tmp_path / 'cache', url='https://schemas.example.test/mcp', transport=httpx.MockTransport(handle))
     with pytest.raises(AssistantError, match='checksum'):
         provider.get('10.5')
     provider.close()
@@ -118,3 +118,29 @@ def test_schema_limits_and_invalid_index(tmp_path):
     (tmp_path / 'index.json').write_text(json.dumps({'schemas':[{'version':'10.5','revision':'r1','sha256':'../outside'}]}))
     with pytest.raises(AssistantError):
         value.package()
+
+
+def test_portable_default_and_explicit_remote_configuration(tmp_path, monkeypatch):
+    from secure_firewall_assistant.schema_registry import BundledCatalogProvider, configured_catalog_provider
+    monkeypatch.delenv('SFA_SCHEMA_MCP_URL', raising=False)
+    provider = configured_catalog_provider(tmp_path, tmp_path / 'cache')
+    assert isinstance(provider, BundledCatalogProvider)
+    assert provider.get('10.5').provenance['selection'] == 'exact'
+    assert provider.get('10.5').provenance['revision'] == 'r2'
+    assert provider.get('9.9').provenance['selection'] == 'latest_fallback'
+    assert provider.get().provenance['source'] == 'bundled_package'
+    settings = tmp_path / 'schema-service.json'
+    settings.write_text('{"url":"https://schemas.example.test/mcp"}')
+    provider = configured_catalog_provider(tmp_path, tmp_path / 'cache')
+    assert isinstance(provider, RemoteCatalogProvider)
+    assert provider.url == 'https://schemas.example.test/mcp'
+    provider.close()
+    monkeypatch.setenv('SFA_SCHEMA_MCP_URL', '')
+    assert isinstance(configured_catalog_provider(tmp_path, tmp_path / 'cache'), BundledCatalogProvider)
+    monkeypatch.delenv('SFA_SCHEMA_MCP_URL')
+    settings.write_text('{"url":42}')
+    with pytest.raises(AssistantError, match='string url'):
+        configured_catalog_provider(tmp_path, tmp_path / 'cache')
+    settings.write_text('{"url":"file:///etc/passwd"}')
+    with pytest.raises(AssistantError, match='HTTP'):
+        configured_catalog_provider(tmp_path, tmp_path / 'cache')

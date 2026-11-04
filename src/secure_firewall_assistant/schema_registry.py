@@ -22,7 +22,6 @@ from .catalog import Catalog
 from .errors import AssistantError
 from .state import atomic_json
 
-DEFAULT_SCHEMA_MCP_URL = "http://10.196.150.41:8765/mcp"
 MAX_PACKAGE = 8 * 1024 * 1024
 MAX_DOCUMENT = 32 * 1024 * 1024
 
@@ -156,7 +155,7 @@ class RemoteCatalogProvider:
 
     def __init__(self, cache, url=None, transport=None, refresh_seconds=60):
         self.cache = Path(cache)
-        self.url = url or os.environ.get("SFA_SCHEMA_MCP_URL", DEFAULT_SCHEMA_MCP_URL)
+        self.url = url or os.environ.get("SFA_SCHEMA_MCP_URL", "")
         from urllib.parse import urlsplit
         origin = urlsplit(self.url)
         if origin.scheme not in ("http", "https") or not origin.hostname or origin.username or origin.password or origin.query or origin.fragment:
@@ -230,14 +229,30 @@ class RemoteCatalogProvider:
 
 
 class BundledCatalogProvider:
-    """Explicit offline test/development provider; production uses remote MCP."""
+    """Portable default using the versioned schema shipped with the plugin."""
 
     def get(self, fmc_version=""):
         catalog = Catalog()
-        catalog.provenance.update(schema_version="10.5.0.0", revision="r1", requested_fmc_version=fmc_version,
+        catalog.provenance.update(schema_version="10.5.0.0", revision=catalog.provenance["schema_revision"], requested_fmc_version=fmc_version,
                                   selection="exact" if fmc_version and version_key(fmc_version) == (10, 5, 0, 0) else "latest_fallback",
-                                  source="explicit_bundled_provider")
+                                  source="bundled_package")
         return catalog
 
     def close(self):
         pass
+
+
+def configured_catalog_provider(config, cache):
+    """Local settings stay outside release archives; an environment URL wins."""
+    url = os.environ.get("SFA_SCHEMA_MCP_URL")
+    if url is None:
+        settings = Path(config) / "schema-service.json"
+        if settings.exists():
+            try:
+                value = json.loads(settings.read_text(encoding="utf-8"))
+                url = value["url"]
+                if not isinstance(url, str):
+                    raise ValueError
+            except (OSError, ValueError, KeyError, TypeError):
+                raise AssistantError("schema_settings_invalid", "schema-service.json must contain a string url.") from None
+    return RemoteCatalogProvider(cache, url=url) if url else BundledCatalogProvider()

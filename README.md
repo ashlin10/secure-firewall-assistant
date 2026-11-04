@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.6.1
+# Secure Firewall Assistant 0.6.7
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
@@ -6,8 +6,8 @@ Lab HTTPS connections accept self-signed certificates by default. Set `verify_ss
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and
-a local YAML credential file. The local helper retrieves API catalogs from the
-shared schema MCP service on the lab network. No tunnel or OpenAI API key is
+a local YAML credential file. The local helper uses the bundled API catalog by default. An optional shared
+schema MCP service can supply versioned updates. No tunnel or OpenAI API key is
 required. Work/model usage follows your ChatGPT plan and workspace settings.
 
 ## Start here
@@ -82,10 +82,8 @@ The assistant has not been installed into your ChatGPT account by this build.
 
 Use a private Git repository, reviewed pull requests, protected release branches,
 and tagged ZIP releases. The included macOS/Windows CI workflow runs the test
-suite; it has not been run remotely by this build. The two source destinations
-and synchronization process are documented in [REPOSITORIES.md](docs/REPOSITORIES.md).
-No workspace account is created automatically. See [CONTRIBUTING.md](CONTRIBUTING.md) and
-[MAINTENANCE.md](docs/MAINTENANCE.md).
+suite; it has not been run remotely by this build. Maintainer repository synchronization settings stay in the source distribution.
+No workspace account is created automatically.
 
 Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) for data flow and trust boundaries.
 Never put actual passwords in chat, source files, issue reports, command-line
@@ -93,11 +91,9 @@ arguments, environment variables, or support logs.
 
 ## Shared schema service and typed inventory (0.4.0)
 
-API schemas are maintained by a shared read-only HTTP MCP service. The local
-helper obtains the catalog for each FMC version, caches it, and keeps device
-connections and execution local. Unknown versions use the latest published
-schema and report that fallback. The initial catalog is FMC 10.5.0.0, revision r1.
-See [schema service operations](docs/SCHEMA-SERVICE.md).
+The bundled FMC 10.5.0.0 schema (revision r2) works without a schema server.
+Optionally configure a shared read-only HTTP MCP service for centrally managed
+schema updates. See [schema configuration](docs/SCHEMA-SERVICE.md).
 
 `devices.yaml` format 2 groups devices under `fmc`, `ftd`, `endpoints`,
 `traffic_generators`, `routers`, and `switches`. The inventory form has a device
@@ -105,3 +101,12 @@ type selector. Existing format-1 files remain readable and migrate on save,
 with an owner-readable backup. Existing accounts and API secrets are preserved.
 The additional categories are inventory support; existing FMC REST execution
 and bounded FTD diagnostics retain their device-type guards.
+
+## Share this plugin
+
+Share the versioned **plugin ZIP** and checksum built by `scripts/package.py`,
+not your installed release/cache directory. Each recipient extracts it and runs
+`Install.command` (macOS) or `Install.ps1` (Windows), then enables the local plugin.
+Each installation resolves that person's home directory and creates its own
+runtime. Inventory, passwords, evidence, installed paths, and environments are
+excluded. See [export/import](docs/SHARING.md) for the complete steps and limits.

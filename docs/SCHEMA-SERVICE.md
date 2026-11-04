@@ -1,7 +1,22 @@
 # Shared FMC schema MCP service
 
-The shared, read-only Streamable HTTP MCP endpoint is
-`http://10.196.150.41:8765/mcp`; `/health` reports published versions.
+By default the plugin uses its bundled FMC 10.5.0.0 schema, revision r2, without
+contacting a schema server. To opt into a shared read-only Streamable HTTP MCP
+service, create `schema-service.json` in the **private_config_directory** reported
+by `assistant_health`, containing:
+
+```json
+{"url": "https://schemas.example.org/mcp"}
+```
+
+Use your organization's actual endpoint. This local settings file is never
+exported. Alternatively set `SFA_SCHEMA_MCP_URL` in the MCP process environment;
+it overrides the file (an empty value selects bundled mode). Restart the server
+after changing settings. Health reports `schema_service.mode` and the selected URL.
+An invalid setting fails explicitly. A configured remote service retains its
+cache/outage behavior; it does not silently fall back to the bundled catalog.
+
+The optional service's `/health` reports published versions.
 It runs independently of Codex as the `secure-firewall-schemas` systemd service.
 The service has no device inventory, credentials, configuration executor, or
 write tools. Its six tools list versions, select/download a schema, search API
@@ -17,9 +32,8 @@ also connect directly to the shared endpoint for schema discovery.
 
 Installing/enabling the plugin loads its bundled `secure-firewall` stdio server
 through `mcp.json` (or `.mcp.json` for compatibility). It does not create a second
-standalone schema-server entry in the client's MCP settings. The local helper
-automatically reaches the shared service when it needs a schema; users need lab
-network access. A separately added `secure-firewall` client registration is a
+standalone schema-server entry in the client's MCP settings. When configured, the local helper
+reaches the shared service when it needs a schema; users need network access. A separately added `secure-firewall` client registration is a
 local development convenience, not a requirement imposed on plugin users.
 The local bootstrap prepares a delivered package update on the next MCP start;
 its stable standalone dispatcher follows the installed plugin version.
@@ -42,8 +56,8 @@ and size limits are verified before loading. Packages are atomically cached unde
 the user's private data directory. If the service cannot be reached, a previously
 validated cached package may be used, explicitly reported as cached. Without a
 cache the operation stops; malformed online packages are rejected rather than
-silently falling back. The bundled file seeds the shared registry and supports
-health/tests, not an implicit production fallback.
+silently falling back. The bundled file is the default catalog when no remote service is configured;
+it also seeds shared registries and supports health/tests.
 
 Only software-version queries and schema content cross this connection; FMC
 credentials, REST request bodies, and evidence stay with the local execution
@@ -88,7 +102,7 @@ No existing service on this machine is replaced.
 ## Separate Cisco source and registry repository
 
 The deployed service is backed up at
-[aleroyds/secure-firewall-schema-service](https://wwwin-github.cisco.com/aleroyds/secure-firewall-schema-service).
+the maintainer-managed schema repository.
 `runtime/` captures deployed source and dependency locks, `deployment/` captures
 the installed systemd unit, and `registry/` stores every schema package, active
 index, and immutable revision history. `snapshot.json` records each file's SHA-256.
