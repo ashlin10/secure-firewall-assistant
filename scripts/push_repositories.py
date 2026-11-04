@@ -47,6 +47,7 @@ def main():
         if sys.platform == "darwin":
             ssh += ["-o", "UseKeychain=yes"]
         github_options = ["-c", "core.sshCommand=" + shlex.join(ssh)]
+    subprocess.run([sys.executable, str(ROOT / "scripts/cleanup_releases.py")], check=True)
     for remote in REMOTES:
         options = github_options if remote == "github" else []
         git(*options, "push", remote, "main")

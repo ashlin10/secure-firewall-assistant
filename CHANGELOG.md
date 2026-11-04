@@ -1,3 +1,9 @@
+## 0.6.9
+
+- Keep only current plugin/source ZIPs after a successful package build.
+- Add verified active-release cleanup for old runtimes and plugin caches, with running-process and identity checks. Preserve private data and schema revision history.
+- Require latest-only release cleanup in the project workflow.
+
 ## 0.6.8
 
 - Restore the shared schema MCP endpoint http://10.196.150.41:8765/mcp as the default in exported plugins, with no recipient configuration required.

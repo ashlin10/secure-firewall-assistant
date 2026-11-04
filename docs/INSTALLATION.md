@@ -85,10 +85,15 @@ explicit upgrades or rollback. A source commit alone does not deliver a new
 package to other users: the configured distribution channel must sync or publish
 it. This implementation does not create or configure a workspace marketplace.
 Start a new chat, or restart the desktop host if it retains an older MCP process.
-Earlier release directories remain available for running processes and rollback.
+Only the current release is retained after release cleanup. Stop old MCP
+processes (restart the desktop host) and run `uv run --no-project --python 3.12
+scripts/cleanup_releases.py` after refreshing and verifying the new release.
+Cleanup refuses to delete a running old release.
 The shared `devices.yaml` beside the release directories is unchanged.
 
-To select a previous successfully installed release:
+Automatic release cleanup removes old runtime directories. To roll back,
+reinstall a reviewed older source/archive first. If cleanup has not yet run,
+you can select a previous successfully installed release:
 
 ```sh
 ./Install.command --rollback PREVIOUS_RELEASE_DIRECTORY_NAME

@@ -28,3 +28,10 @@
   remote change complete until its snapshot is pushed. The main push script
   also runs this synchronization. Use existing admin SSH authentication;
   never commit credentials or copy virtual environments, logs, or device data.
+
+- Retain only the latest plugin/MCP release and packaged archives. After installing,
+  refreshing, and verifying the new release, run `scripts/cleanup_releases.py`.
+  Stop old MCP processes before removal; never interrupt an in-flight device job.
+  Package builds automatically remove this plugin's older versioned ZIPs from
+  their output directory after successful validation. Preserve private data,
+  unrelated plugins/files, Git history, and the schema registry's revision history.

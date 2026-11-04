@@ -111,6 +111,12 @@ def build(output: Path, root=ROOT):
                         "bytes": path.stat().st_size, "files": len(names)})
     (output / "SHA256SUMS").write_text("".join(f"{r['sha256']}  {r['file']}\n" for r in results))
     (output / "release.json").write_text(json.dumps({"version": version, "artifacts": results}, indent=2) + "\n")
+    # Prune only our older archives after both new archives validate successfully.
+    current = tuple(map(int, version.split(".")))
+    for old in output.iterdir():
+        match = re.fullmatch(r"secure-firewall-assistant-(\d+\.\d+\.\d+)-(?:plugin|source)\.zip", old.name)
+        if match and old.is_file() and not old.is_symlink() and tuple(map(int, match[1].split("."))) < current:
+            old.unlink()
     print(json.dumps({"version": version, "artifacts": results}, indent=2))
     return results
 

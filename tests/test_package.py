@@ -44,3 +44,15 @@ def test_export_rejects_personal_paths_and_private_settings(tmp_path):
     (tmp_path / 'scripts/schema-service.json').write_text('{"url":"https://private.example/mcp"}')
     with pytest.raises(ValueError, match='Private/generated'):
         packager.selected_files(tmp_path)
+
+
+def test_build_prunes_only_older_plugin_archives(tmp_path):
+    old = tmp_path / 'secure-firewall-assistant-0.1.0-plugin.zip'
+    old.write_bytes(b'old')
+    unrelated = tmp_path / 'other-plugin-0.1.0.zip'
+    unrelated.write_bytes(b'keep')
+    newer = tmp_path / 'secure-firewall-assistant-99.0.0-source.zip'
+    newer.write_bytes(b'keep')
+    packager.build(tmp_path)
+    assert not old.exists()
+    assert unrelated.read_bytes() == newer.read_bytes() == b'keep'
