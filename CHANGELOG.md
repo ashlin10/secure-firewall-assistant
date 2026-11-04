@@ -1,3 +1,9 @@
+## 0.6.8
+
+- Restore the shared schema MCP endpoint http://10.196.150.41:8765/mcp as the default in exported plugins, with no recipient configuration required.
+- Fetch schemas remotely and check revisions at most once per minute during use; retain validated cached schemas during outages and fail without a cache. Never silently use the bundled snapshot for production operations.
+- Keep local URL overrides and portable packaging; reject empty URLs instead of disabling remote updates.
+
 ## 0.6.7
 
 - Make the recipient ZIP independent of personal paths and private schema infrastructure; use the bundled FMC schema by default with an optional locally configured shared service.

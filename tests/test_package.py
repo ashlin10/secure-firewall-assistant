@@ -22,7 +22,8 @@ def test_archives_are_valid_scoped_and_reproducible(tmp_path):
         assert not any('/deployment/' in n or n.endswith(('push_repositories.py', 'sync_schema_repository.py', 'REPOSITORIES.md')) for n in names)
         for name in names:
             assert b'aleroyds' not in archive.read(name)
-            assert b'10.196.150.41' not in archive.read(name)
+        assert b'http://10.196.150.41:8765/mcp' in archive.read(
+            'secure-firewall-assistant/src/secure_firewall_assistant/schema_registry.py')
         assert "secure-firewall-assistant/Install.ps1" in names
         assert "secure-firewall-assistant/Install.command" in names
         assert archive.getinfo("secure-firewall-assistant/Install.command").external_attr >> 16 & 0o111

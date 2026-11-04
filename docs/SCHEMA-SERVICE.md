@@ -1,9 +1,17 @@
 # Shared FMC schema MCP service
 
-By default the plugin uses its bundled FMC 10.5.0.0 schema, revision r2, without
-contacting a schema server. To opt into a shared read-only Streamable HTTP MCP
-service, create `schema-service.json` in the **private_config_directory** reported
-by `assistant_health`, containing:
+Every exported installation fetches API schemas from the shared read-only
+Streamable HTTP MCP endpoint **`http://10.196.150.41:8765/mcp`** by default.
+The address ships in the runtime source; recipients do not configure it again.
+They need network access to this internal endpoint. `/health` reports published
+versions. Schema updates are fetched during use, at most once per minute per FMC
+version, without reinstalling the plugin. Each operation pins one revision
+through validation and read-back. Bootstrap health uses the bundled snapshot;
+schema-dependent operations use the remote service or a validated remote cache,
+never a silent fallback to the bundled snapshot.
+
+To override the endpoint locally, create `schema-service.json` in the
+**private_config_directory** reported by `assistant_health`, containing:
 
 ```json
 {"url": "https://schemas.example.org/mcp"}
@@ -11,12 +19,9 @@ by `assistant_health`, containing:
 
 Use your organization's actual endpoint. This local settings file is never
 exported. Alternatively set `SFA_SCHEMA_MCP_URL` in the MCP process environment;
-it overrides the file (an empty value selects bundled mode). Restart the server
+it overrides the file. Empty or invalid URLs fail explicitly. Restart the server
 after changing settings. Health reports `schema_service.mode` and the selected URL.
-An invalid setting fails explicitly. A configured remote service retains its
-cache/outage behavior; it does not silently fall back to the bundled catalog.
 
-The optional service's `/health` reports published versions.
 It runs independently of Codex as the `secure-firewall-schemas` systemd service.
 The service has no device inventory, credentials, configuration executor, or
 write tools. Its six tools list versions, select/download a schema, search API
@@ -32,7 +37,7 @@ also connect directly to the shared endpoint for schema discovery.
 
 Installing/enabling the plugin loads its bundled `secure-firewall` stdio server
 through `mcp.json` (or `.mcp.json` for compatibility). It does not create a second
-standalone schema-server entry in the client's MCP settings. When configured, the local helper
+standalone schema-server entry in the client's MCP settings. The local helper
 reaches the shared service when it needs a schema; users need network access. A separately added `secure-firewall` client registration is a
 local development convenience, not a requirement imposed on plugin users.
 The local bootstrap prepares a delivered package update on the next MCP start;
@@ -56,8 +61,8 @@ and size limits are verified before loading. Packages are atomically cached unde
 the user's private data directory. If the service cannot be reached, a previously
 validated cached package may be used, explicitly reported as cached. Without a
 cache the operation stops; malformed online packages are rejected rather than
-silently falling back. The bundled file is the default catalog when no remote service is configured;
-it also seeds shared registries and supports health/tests.
+silently falling back. The bundled file seeds shared registries and supports bootstrap health/tests;
+it is not a production fallback.
 
 Only software-version queries and schema content cross this connection; FMC
 credentials, REST request bodies, and evidence stay with the local execution

@@ -121,14 +121,12 @@ def test_schema_limits_and_invalid_index(tmp_path):
 
 
 def test_portable_default_and_explicit_remote_configuration(tmp_path, monkeypatch):
-    from secure_firewall_assistant.schema_registry import BundledCatalogProvider, configured_catalog_provider
+    from secure_firewall_assistant.schema_registry import DEFAULT_SCHEMA_MCP_URL, configured_catalog_provider
     monkeypatch.delenv('SFA_SCHEMA_MCP_URL', raising=False)
     provider = configured_catalog_provider(tmp_path, tmp_path / 'cache')
-    assert isinstance(provider, BundledCatalogProvider)
-    assert provider.get('10.5').provenance['selection'] == 'exact'
-    assert provider.get('10.5').provenance['revision'] == 'r2'
-    assert provider.get('9.9').provenance['selection'] == 'latest_fallback'
-    assert provider.get().provenance['source'] == 'bundled_package'
+    assert isinstance(provider, RemoteCatalogProvider)
+    assert provider.url == DEFAULT_SCHEMA_MCP_URL == 'http://10.196.150.41:8765/mcp'
+    provider.close()
     settings = tmp_path / 'schema-service.json'
     settings.write_text('{"url":"https://schemas.example.test/mcp"}')
     provider = configured_catalog_provider(tmp_path, tmp_path / 'cache')
@@ -136,7 +134,8 @@ def test_portable_default_and_explicit_remote_configuration(tmp_path, monkeypatc
     assert provider.url == 'https://schemas.example.test/mcp'
     provider.close()
     monkeypatch.setenv('SFA_SCHEMA_MCP_URL', '')
-    assert isinstance(configured_catalog_provider(tmp_path, tmp_path / 'cache'), BundledCatalogProvider)
+    with pytest.raises(AssistantError, match='HTTP'):
+        configured_catalog_provider(tmp_path, tmp_path / 'cache')
     monkeypatch.delenv('SFA_SCHEMA_MCP_URL')
     settings.write_text('{"url":42}')
     with pytest.raises(AssistantError, match='string url'):

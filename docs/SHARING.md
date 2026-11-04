@@ -13,7 +13,7 @@ Share `secure-firewall-assistant-<version>-plugin.zip` and its matching line fro
 `SHA256SUMS` over your chosen trusted channel. The source ZIP is for maintainers;
 it also contains tests, CI, and repository/deployment maintenance settings.
 The plugin ZIP excludes those maintainer settings and includes the locked
-runtime source, bundled schema, skills, forms, and installers.
+runtime source, default remote schema-server URL, skills, forms, and installers.
 
 Do not ZIP an installed cache or runtime directory: local manifests may contain
 an absolute uv path, and runtime state contains private paths or inventory.
@@ -36,10 +36,13 @@ virtual environments, local settings, or machine-specific MCP registration.
 6. Ask to enroll devices and enter your own accounts in the local form.
 
 Initial setup downloads Python 3.12 and locked dependencies. Device operations
-require network access to the recipient's devices. API discovery uses the bundled
-FMC 10.5.0.0 r2 schema by default; other versions report `latest_fallback`.
-For automatic shared schema updates, configure your organization's endpoint as
-shown in [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md).
+require network access to the recipient's devices and the schema server at
+`http://10.196.150.41:8765/mcp`. That URL is included in the exported package;
+recipients do not configure it again. Schemas are fetched remotely and checked
+for updates at most once per minute during use. Schema updates do not require
+redistributing the plugin. Validated cached schemas can be used during outages;
+without a cache, schema-dependent operations stop. The bundled snapshot is not
+used as a silent fallback. See [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md).
 
 This is a local-executor plugin, not a hosted connector. A ZIP/account upload
 cannot enable device access in cloud-only chats or override workspace policy.

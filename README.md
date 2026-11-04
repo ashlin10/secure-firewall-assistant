@@ -1,4 +1,4 @@
-# Secure Firewall Assistant 0.6.7
+# Secure Firewall Assistant 0.6.8
 
 Large independent create jobs use declared native bulk where available, otherwise up to four concurrent supported POSTs with one collection read-back. Discovery exposes execution options across REST methods; inspect them before large jobs.
 
@@ -6,8 +6,8 @@ Lab HTTPS connections accept self-signed certificates by default. Set `verify_ss
 
 A private desktop-only plugin for ChatGPT Work on **macOS and Windows**. It uses
 the supplied FMC OpenAPI reference, a local MCP helper, a private inventory, and
-a local YAML credential file. The local helper uses the bundled API catalog by default. An optional shared
-schema MCP service can supply versioned updates. No tunnel or OpenAI API key is
+a local YAML credential file. The local helper fetches versioned API catalogs from the shared schema MCP at
+`http://10.196.150.41:8765/mcp` by default, including after importing the ZIP. No tunnel or OpenAI API key is
 required. Work/model usage follows your ChatGPT plan and workspace settings.
 
 ## Start here
@@ -91,9 +91,12 @@ arguments, environment variables, or support logs.
 
 ## Shared schema service and typed inventory (0.4.0)
 
-The bundled FMC 10.5.0.0 schema (revision r2) works without a schema server.
-Optionally configure a shared read-only HTTP MCP service for centrally managed
-schema updates. See [schema configuration](docs/SCHEMA-SERVICE.md).
+All installations fetch schemas from `http://10.196.150.41:8765/mcp` by default.
+Active users check for schema revisions at most once per minute per FMC version;
+no plugin reinstall is needed for schema updates. A validated cached schema is
+used during service outages; without a cache, operations stop. The bundled
+snapshot supports bootstrap health/tests, not a silent production fallback.
+See [schema configuration](docs/SCHEMA-SERVICE.md).
 
 `devices.yaml` format 2 groups devices under `fmc`, `ftd`, `endpoints`,
 `traffic_generators`, `routers`, and `switches`. The inventory form has a device

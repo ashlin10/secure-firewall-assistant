@@ -22,6 +22,7 @@ from .catalog import Catalog
 from .errors import AssistantError
 from .state import atomic_json
 
+DEFAULT_SCHEMA_MCP_URL = "http://10.196.150.41:8765/mcp"
 MAX_PACKAGE = 8 * 1024 * 1024
 MAX_DOCUMENT = 32 * 1024 * 1024
 
@@ -155,7 +156,7 @@ class RemoteCatalogProvider:
 
     def __init__(self, cache, url=None, transport=None, refresh_seconds=60):
         self.cache = Path(cache)
-        self.url = url or os.environ.get("SFA_SCHEMA_MCP_URL", "")
+        self.url = url if url is not None else os.environ.get("SFA_SCHEMA_MCP_URL", DEFAULT_SCHEMA_MCP_URL)
         from urllib.parse import urlsplit
         origin = urlsplit(self.url)
         if origin.scheme not in ("http", "https") or not origin.hostname or origin.username or origin.password or origin.query or origin.fragment:
@@ -229,7 +230,7 @@ class RemoteCatalogProvider:
 
 
 class BundledCatalogProvider:
-    """Portable default using the versioned schema shipped with the plugin."""
+    """Explicit offline test/development provider, never the production default."""
 
     def get(self, fmc_version=""):
         catalog = Catalog()
@@ -255,4 +256,4 @@ def configured_catalog_provider(config, cache):
                     raise ValueError
             except (OSError, ValueError, KeyError, TypeError):
                 raise AssistantError("schema_settings_invalid", "schema-service.json must contain a string url.") from None
-    return RemoteCatalogProvider(cache, url=url) if url else BundledCatalogProvider()
+    return RemoteCatalogProvider(cache, url=DEFAULT_SCHEMA_MCP_URL if url is None else url)

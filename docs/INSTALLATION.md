@@ -149,9 +149,11 @@ standalone registration with
 
 ## Shared schemas and format-2 inventory (0.4.0)
 
-Clients retain the local plugin and stdio execution server. The bundled schema
-works without access to the maintainer's network. An optional shared schema MCP
-service can be configured per user; see [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md).
+Clients retain the local plugin and stdio execution server. The exported package
+uses `http://10.196.150.41:8765/mcp` for automatic schema updates by default.
+Recipients need network access to that endpoint; no URL setup is required.
+Validated cached schemas remain usable during outages; without a cache,
+schema-dependent operations stop. See [SCHEMA-SERVICE.md](SCHEMA-SERVICE.md).
 Use the portable plugin ZIP to share with others; see [SHARING.md](SHARING.md).
 
 The inventory form writes format-3 YAML with device-type lists nested under `devices` with a device-type dropdown.

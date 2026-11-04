@@ -2,9 +2,9 @@
 
 ChatGPT Work loads a reusable skill and launches a local Python MCP helper over
 stdio. The helper reaches FMC HTTPS and optional FTD SSH from the user's machine.
-The local helper has no inbound listener. It uses the bundled schema by default.
-An optional locally configured read-only HTTP MCP service distributes versioned
-API catalogs. Device access
+The local helper has no inbound listener. It fetches versioned API catalogs
+from the shared read-only HTTP MCP service at `http://10.196.150.41:8765/mcp`
+by default. This endpoint is included in exported packages. Device access
 continues from the user’s machine; no device credentials are sent to that service.
 The bundled launch entry bootstraps from `${PLUGIN_ROOT}` into a durable prepared
 release, so the desktop plugin cache never needs a portable virtual environment.
