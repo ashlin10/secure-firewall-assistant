@@ -40,8 +40,10 @@ curl commands, browser actions, or a shell that reads credentials.
   It refreshes revisions during use and uses validated remote caches during outages;
   without a cache it stops rather than using the bundled snapshot. Pass `target` to all discovery and describe tools for
   the selected FMC; omitting it selects the latest schema without a device read.
-  The initial published schema is 10.5.0.0. If the exact FMC version is absent,
-  use the latest published schema as requested and report `latest_fallback`.
+  The initial published schema is 10.5.0.0. Use the observed FMC version for every target action. Exact versions take
+  precedence; patch releases select their major/minor baseline and report
+  `release_family`. Only an unpublished family uses the latest published schema
+  and reports `latest_fallback`.
   Schema corrections refresh automatically; each operation pins its selected
   revision through validation and verification. Report cache/outage status and
   compatibility warnings. Every enrolled category supports SSH through `device_ssh`

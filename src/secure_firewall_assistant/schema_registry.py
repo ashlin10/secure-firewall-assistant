@@ -81,10 +81,13 @@ class SchemaRegistry:
         entries = self.versions()
         requested = version_key(fmc_version) if fmc_version else None
         exact = next((e for e in entries if version_key(e["version"]) == requested), None)
-        selected = exact or entries[-1]
+        family = next((e for e in entries if requested and
+                       version_key(e["version"])[:2] == requested[:2] and
+                       version_key(e["version"])[2:] == (0, 0)), None)
+        selected = exact or family or entries[-1]
         return {"requested_fmc_version": fmc_version, "schema_version": selected["version"],
                 "revision": selected["revision"], "sha256": selected["sha256"],
-                "selection": "exact" if exact else "latest_fallback" if fmc_version else "latest",
+                "selection": "exact" if exact else "release_family" if family else "latest_fallback" if fmc_version else "latest",
                 "compatibility_verified": False}
 
     def package(self, fmc_version=""):

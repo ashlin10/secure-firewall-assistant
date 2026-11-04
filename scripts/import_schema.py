@@ -6,6 +6,7 @@ import json
 import re
 from pathlib import Path
 
+from convert_swagger import convert_swagger
 from schema_corrections import CORRECTION_NOTE, apply_corrections
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,31 +78,37 @@ def unresolved_refs(doc):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
+    parser.add_argument("--output", type=Path, default=DATA,
+                        help="Output directory; use a separate staging directory for registry publications")
+    parser.add_argument("--fmc-version", default="10.5.0.0", help="Owner-supplied FMC schema version")
     args = parser.parse_args()
     raw = args.source.read_bytes()
     doc = json.loads(raw)
     cleaned = sanitize(doc, example_credentials(doc))
-    apply_corrections(cleaned)
+    cleaned = convert_swagger(cleaned)
+    if args.fmc_version == "10.5.0.0":
+        apply_corrections(cleaned)
     encoded = json.dumps(cleaned, separators=(",", ":"), sort_keys=True).encode()
-    DATA.mkdir(parents=True, exist_ok=True)
-    (DATA / "fmc.openapi.json.gz").write_bytes(gzip.compress(encoded, mtime=0))
+    args.output.mkdir(parents=True, exist_ok=True)
+    (args.output / "fmc.openapi.json.gz").write_bytes(gzip.compress(encoded, mtime=0))
     operations = [o for v in doc["paths"].values() for m, o in v.items()
                   if m in {"get", "post", "put", "patch", "delete", "head", "options"}]
     provenance = {
         "source_filename": args.source.name,
         "source_sha256": hashlib.sha256(raw).hexdigest(),
         "sanitized_sha256": hashlib.sha256(encoded).hexdigest(),
-        "openapi": doc["openapi"], "info_version": doc["info"]["version"],
-        "declared_device_version": None,
+        "openapi": cleaned["openapi"], "info_version": doc["info"]["version"],
+        "declared_device_version": args.fmc_version,
         "paths": len(doc["paths"]), "operations": len(operations),
-        "schemas": len(doc["components"]["schemas"]),
+        "schemas": len(cleaned["components"]["schemas"]),
         "unresolved_references": unresolved_refs(cleaned),
-        "transformations": [CORRECTION_NOTE, "Removed all example/examples and code sample fields",
+        "transformations": ([CORRECTION_NOTE] if args.fmc_version == "10.5.0.0" else []) +
+                           (["Converted Swagger 2.0 to OpenAPI 3.0.1"] if doc.get("swagger") == "2.0" else []) + [ "Removed all example/examples and code sample fields",
                             "Removed non-structural sample credential values repeated elsewhere in the document",
                             "Replaced non-public-documentation example URLs",
                             "No missing definitions fabricated; affected response validation reports a warning"],
     }
-    (DATA / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+    (args.output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     print(json.dumps(provenance, indent=2))
 
 

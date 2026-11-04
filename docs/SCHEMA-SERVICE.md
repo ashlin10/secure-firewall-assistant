@@ -45,12 +45,14 @@ its stable standalone dispatcher follows the installed plugin version.
 After updating the plugin, start a new local chat; an existing
 desktop process may retain old tool/resource definitions until restarted.
 
-The supplied, maintained schema is identified as FMC **10.5.0.0, revision r2**,
-based on the project owner's version identification. This does not assert live
+The published families are FMC **7.0, 7.1, 7.2, 7.3, 7.4, 7.6, 7.7, 10.0,
+and 10.1 (r1)**, plus **10.5 (r2)**, based on the project owner's schema mappings. This does not assert live
 compatibility with every operation or FMC build. Numeric versions are normalized
 to four components; build labels do not change the schema version selection.
-An absent version selects the highest numeric published version, even if the
-requested FMC is older or newer. The selection, fallback status, revision,
+An exact version wins. Patch releases select the baseline of their major/minor
+family (`release_family`); for example 7.4.2 uses 7.4.0.0. Unknown families
+retain the explicitly reported `latest_fallback`. Discovery without a target
+selects the latest published version. The selection, fallback status, revision,
 checksum, and remote/cache source appear in discovery and saved evidence.
 Existing explicit device `expected_version_prefix` write constraints still apply.
 
@@ -80,8 +82,10 @@ The service runs as the unprivileged `secure-firewall-schema` account with a
 read-only filesystem sandbox. Schema publishing is an administrative SSH task;
 there are deliberately no upload or mutation tools exposed over HTTP.
 
-Validate and sanitize a new source with `scripts/import_schema.py`, apply reviewed
-corrections, and test it before publication. On the server, publish the resulting
+Validate and sanitize a new source with `scripts/import_schema.py SOURCE
+--fmc-version VERSION --output STAGING_DIRECTORY`, then test it before
+publication. The 7.0 Swagger 2.0 input is converted to OpenAPI 3.0.1; 10.5-only
+corrections are not applied to other versions. On the server, publish the resulting
 compressed OpenAPI file using a new revision:
 
 ```sh

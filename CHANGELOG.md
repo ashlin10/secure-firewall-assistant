@@ -1,3 +1,9 @@
+## 0.6.10
+
+- Add release-family schema selection: exact versions win, patch/build versions use their major/minor baseline, and unpublished families report latest fallback.
+- Support staged, version-specific schema imports and faithful Swagger 2.0 conversion for FMC 7.0 without applying 10.5-specific corrections.
+- Publish sanitized schemas for FMC 7.0, 7.1, 7.2, 7.3, 7.4, 7.6, 7.7, 10.0, and 10.1 as r1 while preserving 10.5 r2 and immutable schema history.
+
 ## 0.6.9
 
 - Keep only current plugin/source ZIPs after a successful package build.

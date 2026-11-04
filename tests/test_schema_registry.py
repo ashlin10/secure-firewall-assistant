@@ -143,3 +143,19 @@ def test_portable_default_and_explicit_remote_configuration(tmp_path, monkeypatc
     settings.write_text('{"url":"file:///etc/passwd"}')
     with pytest.raises(AssistantError, match='HTTP'):
         configured_catalog_provider(tmp_path, tmp_path / 'cache')
+
+
+@pytest.mark.parametrize('family', ['7.0', '7.1', '7.2', '7.3', '7.4', '7.6', '7.7', '10.0', '10.1'])
+def test_patch_and_build_versions_select_their_release_family(tmp_path, family):
+    value = registry(tmp_path)
+    publish(tmp_path, DATA / 'fmc.openapi.json.gz', family + '.0.0', 'r1')
+    for observed in [family + '.2', family + '.2.1', family + '.2 (build 160)']:
+        result = value.resolve(observed)
+        assert result['schema_version'] == family + '.0.0'
+        assert result['selection'] == 'release_family'
+        assert decode_package(value.package(observed))['paths']
+    assert value.resolve(family + '.0')['selection'] == 'exact'
+    publish(tmp_path, DATA / 'fmc.openapi.json.gz', family + '.2.1', 'patch1')
+    assert value.resolve(family + '.2.1')['selection'] == 'exact'
+    assert value.resolve(family + '.2.1')['revision'] == 'patch1'
+    assert value.resolve('8.0.1')['selection'] == 'latest_fallback'
