@@ -167,6 +167,30 @@ def test_standalone_refuses_ambiguous_plugin_identities(tmp_path):
         runtime.installed_source(tmp_path, 'fixture-codex', listing)
 
 
+def test_standalone_scopes_discovery_to_enabled_marketplace(tmp_path):
+    selected = source_at(tmp_path / '.codex/plugins/cache/team' / runtime.NAME / '1.1.0', '1.1.0')
+    (tmp_path / '.codex/config.toml').write_text(
+        '[plugins."secure-firewall-assistant@team"]\nenabled=true\n'
+        '[plugins."secure-firewall-assistant@old"]\nenabled=false\n')
+    entry = {'name': runtime.NAME, 'installed': True, 'enabled': True,
+             'version': '1.1.0', 'marketplaceName': 'team'}
+    def listing(command, **kwargs):
+        assert command == ['fixture-codex', 'plugin', 'list', '--json', '--marketplace', 'team']
+        return subprocess.CompletedProcess(command, 0, json.dumps({'installed': [entry]}))
+    assert runtime.installed_source(tmp_path, 'fixture-codex', listing) == selected
+
+
+def test_standalone_refuses_multiple_configured_copies_before_scoped_query(tmp_path):
+    (tmp_path / '.codex').mkdir()
+    (tmp_path / '.codex/config.toml').write_text(
+        '[plugins."secure-firewall-assistant@one"]\nenabled=true\n'
+        '[plugins."secure-firewall-assistant@two"]\nenabled=true\n')
+    def listing(*args, **kwargs):
+        pytest.fail('Ambiguous configuration must not select a marketplace')
+    with pytest.raises(RuntimeError, match='Multiple enabled'):
+        runtime.installed_source(tmp_path, 'fixture-codex', listing)
+
+
 def test_real_package_refresh_and_stable_dispatcher_over_stdio(tmp_path):
     uv = shutil.which('uv')
     if not uv:

@@ -262,7 +262,21 @@ def installed_source(home, codex_binary, runner=subprocess.run):
     the newest leftover cache directory. This also supports hosts using only the
     standalone registration rather than starting the bundled MCP process.
     """
-    result = runner([codex_binary, "plugin", "list", "--json"], capture_output=True, text=True,
+    command = [codex_binary, "plugin", "list", "--json"]
+    config = home / ".codex/config.toml"
+    if config.is_file():
+        plugins = tomllib.loads(config.read_text(encoding="utf-8")).get("plugins", {})
+        enabled = [key.removeprefix(NAME + "@") for key, policy in plugins.items()
+                   if key.startswith(NAME + "@") and isinstance(policy, dict) and policy.get("enabled") is True]
+        if len(enabled) > 1:
+            raise RuntimeError("Multiple enabled Secure Firewall plugins are installed; select one before starting the standalone MCP")
+        if enabled:
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+", enabled[0]):
+                raise RuntimeError("The installed plugin has an unsupported marketplace identity")
+            # Unrelated remote marketplaces can stall global discovery. Resolve
+            # the selected version through the CLI for our configured market.
+            command += ["--marketplace", enabled[0]]
+    result = runner(command, capture_output=True, text=True,
                     check=True, timeout=30, env=clean_environment())
     entries = [item for item in json.loads(result.stdout).get("installed", [])
                if item.get("name") == NAME and item.get("installed") and item.get("enabled")]

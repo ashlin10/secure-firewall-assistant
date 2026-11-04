@@ -1,3 +1,7 @@
+## 0.6.6
+
+- Scope standalone MCP plugin discovery to its enabled marketplace so unrelated marketplace lookups cannot block startup. Preserve duplicate-plugin checks.
+
 ## 0.6.5
 
 - Compare deployment preview content independently of FMC’s per-read deployment timestamp, and submit the latest timestamp after revalidation.

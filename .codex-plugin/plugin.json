@@ -1,6 +1,6 @@
 {
   "name": "secure-firewall-assistant",
-  "version": "0.6.1",
+  "version": "0.6.6",
   "description": "Configure enrolled lab devices through FMC REST and arbitrary authorized SSH commands.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

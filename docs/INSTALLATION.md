@@ -66,7 +66,9 @@ dependencies require network access during preparation.
 
 The stable standalone dispatcher resolves the enabled installed plugin through
 `codex plugin list --json`, then delegates to that package's bootstrap. It uses the
-CLI's selected version, not the highest leftover cache directory. If the Codex CLI
+CLI's selected version, not the highest leftover cache directory. Discovery is scoped
+to the marketplace enabled in the Codex plugin configuration, avoiding unrelated
+marketplace lookups during MCP startup. If the Codex CLI
 is unavailable, it can refresh an existing package root or use the last prepared
 runtime; it cannot discover a newly selected cache directory without the CLI.
 Multiple enabled copies of this plugin require choosing one. Custom standalone
