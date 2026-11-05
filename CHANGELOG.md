@@ -1,3 +1,8 @@
+## 0.6.11
+
+- Preserve JSON Schema primitive types when sanitizing sample credentials so boolean request parameters remain valid.
+- Republish affected 7.0, 7.6, and 7.7 families as r2, preserving immutable prior revisions.
+
 ## 0.6.10
 
 - Add release-family schema selection: exact versions win, patch/build versions use their major/minor baseline, and unpublished families report latest fallback.

@@ -46,7 +46,10 @@ After updating the plugin, start a new local chat; an existing
 desktop process may retain old tool/resource definitions until restarted.
 
 The published families are FMC **7.0, 7.1, 7.2, 7.3, 7.4, 7.6, 7.7, 10.0,
-and 10.1 (r1)**, plus **10.5 (r2)**, based on the project owner's schema mappings. This does not assert live
+and 10.1**, plus **10.5**, based on the project owner's schema mappings.
+Families 7.0, 7.6, and 7.7 use r2 to restore primitive types that an example
+credential placeholder had caused the sanitizer to redact; other families retain
+their previous revisions (10.5 r2, remaining families r1). This does not assert live
 compatibility with every operation or FMC build. Numeric versions are normalized
 to four components; build labels do not change the schema version selection.
 An exact version wins. Patch releases select the baseline of their major/minor

@@ -30,7 +30,10 @@ def sanitize(value, redactions=()):
 
 
 def example_credentials(doc):
-    candidates, identifiers = set(), set()
+    # Example password fields sometimes contain a schema type as a placeholder.
+    # These public grammar tokens must never become global redaction targets.
+    candidates = set()
+    identifiers = {"array", "boolean", "integer", "null", "number", "object", "string"}
 
     def walk(value, example=False):
         if isinstance(value, dict):
